@@ -239,7 +239,7 @@ bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
 
   // Chỉ kiểm tra nếu là nhóm có ID
-  if (chatId == -1002247863313 || chatId == -1002303292016) {
+  if (chatId == -1002247863313 || chatId == -1002303292016 || chatId == -1002499533124) {
 
     // Kiểm tra nếu tin nhắn chứa từ khóa "xong (số) acc (số) nhóm"
     const messageContent = msg.text || msg.caption;
@@ -266,9 +266,10 @@ async function processAccMessage2(msg) {
     return;
   }
 
-  // Tính tiền dựa trên số nhóm
-  let moneyPerAcc = 0;
-  if (groups === 1) {
+ let moneyPerAcc = 0;
+  if (chatId == -1002499533124 && groups === 5) {
+    moneyPerAcc = 10000;
+  } else if (groups === 1) {
     moneyPerAcc = 3000;
   } else if (groups === 2) {
     moneyPerAcc = 5000;
@@ -939,7 +940,7 @@ const regex = /\d+\s*(quẩy|q|cộng|c|\+|bill|ảnh|hình)/gi;
 const EXCLUDED_CHAT_IDS = [
   -1002103270166, -1002397067352, -1002312409314,
   -1002336524767, -1002295387259, -1002128975957,
-  -1002247863313, -1002192201870,
+  -1002247863313, -1002192201870, -1002499533124,
   -1002303292016, -1002128975957
 ];
 
@@ -1498,6 +1499,7 @@ const kickbot = {
   "-1002103270166": "Tổng bank",
   "-1002128289933": "test",
   "-1002479414582": "ei292", 
+  "-1002499533124": "ekfrek",
   "-1002449707024": "19dkfkw", 
   "-1002108234982": "community free",
   "-1002163768880": "tra sua",
