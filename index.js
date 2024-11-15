@@ -239,7 +239,7 @@ bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
 
   // Chỉ kiểm tra nếu là nhóm có ID
-  if (chatId == -1002247863313 || chatId == -1002303292016 || chatId == -1002499533124) {
+  if (chatId == -1002247863313 || chatId == -1002303292016) {
 
     // Kiểm tra nếu tin nhắn chứa từ khóa "xong (số) acc (số) nhóm"
     const messageContent = msg.text || msg.caption;
