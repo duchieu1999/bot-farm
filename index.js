@@ -266,14 +266,13 @@ async function processAccMessage2(msg) {
     return;
   }
 
- let moneyPerAcc = 0;
-  if (chatId == -1002499533124 && groups === 5) {
-    moneyPerAcc = 10000;
-  } else if (groups === 1) {
+  // Tính tiền dựa trên số nhóm
+  let moneyPerAcc = 0;
+  if (groups === 1) {
     moneyPerAcc = 3000;
   } else if (groups === 2) {
     moneyPerAcc = 5000;
-  } else if (groups = 3) {
+  } else if (groups >= 3) {
     moneyPerAcc = 7000;
   } else {
     // Nếu số nhóm không hợp lệ, gửi thông báo lỗi
@@ -290,6 +289,88 @@ async function processAccMessage2(msg) {
   const fullName = lastName ? `${firstName} ${lastName}` : firstName;
 
   const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${acc} Acc, ${groups} nhóm. Tổng tiền: ${totalMoney.toLocaleString()} VNĐ ❤🥳`;
+
+  bot.sendMessage(groupId, responseMessage, { reply_to_message_id: msg.message_id }).then(async () => {
+    let trasua = await Trasua.findOne({ userId, groupId, date: currentDate });
+
+    if (!trasua) {
+      trasua = await Trasua.create({
+        userId,
+        groupId,
+        date: currentDate,
+        ten: fullName,
+        acc,
+        tinh_tien: totalMoney,
+      });
+    } else {
+      trasua.acc += acc;
+      trasua.tinh_tien += totalMoney;
+      await trasua.save();
+    }
+  });
+}
+
+
+
+const accRegex4 = /xong\s*(\d+)\s*acc\s*(\d+)\s*nhóm/i;
+
+// Đăng ký sự kiện cho bot
+bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
+
+  // Chỉ kiểm tra nếu là nhóm có ID
+  if (chatId == -1002499533124) {
+
+    // Kiểm tra nếu tin nhắn chứa từ khóa "xong (số) acc (số) nhóm"
+    const messageContent = msg.text || msg.caption;
+    if (messageContent && /xong\s*\d+\s*acc\s*\d+\s*nhóm/gi.test(messageContent)) {
+      await processAccMessage4(msg); // Gọi hàm xử lý tin nhắn
+    }
+  }
+});
+
+async function processAccMessage4(msg) {
+  const messageContent = msg.text || msg.caption;
+  const accMatches = messageContent.match(accRegex4);
+  const userId = msg.from.id;
+  const groupId = msg.chat.id;
+
+  if (!accMatches) return;
+
+  const acc = parseInt(accMatches[1]);  // Số acc
+  const groups = parseInt(accMatches[2]);  // Số nhóm
+
+  // Nếu số acc lớn hơn 100, gửi thông báo nghịch linh tinh và không xử lý tiếp
+  if (acc > 100) {
+    bot.sendMessage(groupId, 'Nộp gian lận là xấu tính 😕', { reply_to_message_id: msg.message_id });
+    return;
+  }
+
+  // Tính tiền dựa trên số nhóm
+  let moneyPerAcc = 0;
+  if (groups === 1) {
+    moneyPerAcc = 3000;
+  } else if (groups === 2) {
+    moneyPerAcc = 5000;
+  } else if (groups === 3) {
+    moneyPerAcc = 7000;
+  } else if (groups === 5) {
+    moneyPerAcc = 10000;
+  } else {
+    // Nếu số nhóm không hợp lệ, gửi thông báo lỗi
+    bot.sendMessage(groupId, 'Số nhóm phải từ 1 đến 3 thôi nhé! 😅', { reply_to_message_id: msg.message_id });
+    return;
+  }
+
+  // Tính tổng tiền
+  let totalMoney = acc * moneyPerAcc;
+
+  const currentDate = new Date().toLocaleDateString();
+  const firstName = msg.from.first_name;
+  const lastName = msg.from.last_name;
+  const fullName = lastName ? ${firstName} ${lastName} : firstName;
+
+  const responseMessage = Bài nộp của ${fullName} đã được ghi nhận với ${acc} Acc, ${groups} nhóm. Tổng tiền: ${totalMoney.toLocaleString()} VNĐ ❤🥳;
 
   bot.sendMessage(groupId, responseMessage, { reply_to_message_id: msg.message_id }).then(async () => {
     let trasua = await Trasua.findOne({ userId, groupId, date: currentDate });
@@ -330,7 +411,7 @@ bot.on('message', async (msg) => {
         await processAccMessage4(msg); // Gọi hàm xử lý tin nhắn
       } else {
         // Báo lỗi cú pháp
-        bot.sendMessage(chatId, 'Bạn nộp sai cú pháp nhóm lương 5 ngày này, hãy ghi đúng như sau: Số Acc làm, số Bill lên. Ví dụ: 1 acc 1 bill hoặc 1 acc', { reply_to_message_id: msg.message_id });
+        bot.sendMessage(chatId, 'Bạn nộp sai cú pháp, hãy ghi đúng như sau: Số Acc làm, số Bill lên. Ví dụ: 1 acc 1 bill hoặc 1 acc', { reply_to_message_id: msg.message_id });
       }
     }
   }
