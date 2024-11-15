@@ -312,7 +312,7 @@ async function processAccMessage2(msg) {
 
 
 
-const accRegex4 = /xong\s*(\d+)\s*acc\s*(\d+)\s*nhóm/i;
+const accRegex5 = /xong\s*(\d+)\s*acc\s*(\d+)\s*nhóm/i;
 
 // Đăng ký sự kiện cho bot
 bot.on('message', async (msg) => {
@@ -324,14 +324,14 @@ bot.on('message', async (msg) => {
     // Kiểm tra nếu tin nhắn chứa từ khóa "xong (số) acc (số) nhóm"
     const messageContent = msg.text || msg.caption;
     if (messageContent && /xong\s*\d+\s*acc\s*\d+\s*nhóm/gi.test(messageContent)) {
-      await processAccMessage4(msg); // Gọi hàm xử lý tin nhắn
+      await processAccMessage5(msg); // Gọi hàm xử lý tin nhắn
     }
   }
 });
 
-async function processAccMessage4(msg) {
+async function processAccMessage5(msg) {
   const messageContent = msg.text || msg.caption;
-  const accMatches = messageContent.match(accRegex4);
+  const accMatches = messageContent.match(accRegex5);
   const userId = msg.from.id;
   const groupId = msg.chat.id;
 
@@ -346,7 +346,7 @@ async function processAccMessage4(msg) {
     return;
   }
 
-  // Tính tiền dựa trên số nhóm
+   // Tính tiền dựa trên số nhóm
   let moneyPerAcc = 0;
   if (groups === 1) {
     moneyPerAcc = 3000;
@@ -354,7 +354,8 @@ async function processAccMessage4(msg) {
     moneyPerAcc = 5000;
   } else if (groups === 3) {
     moneyPerAcc = 7000;
-  } else if (groups === 5) {
+  } 
+    else if (groups === 5) {
     moneyPerAcc = 10000;
   } else {
     // Nếu số nhóm không hợp lệ, gửi thông báo lỗi
@@ -370,7 +371,7 @@ async function processAccMessage4(msg) {
   const lastName = msg.from.last_name;
   const fullName = lastName ? `${firstName} ${lastName}` : firstName;
 
-  const responseMessage = Bài nộp của ${fullName} đã được ghi nhận với ${acc} Acc, ${groups} nhóm. Tổng tiền: ${totalMoney.toLocaleString()} VNĐ ❤🥳;
+  const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${acc} Acc, ${groups} nhóm. Tổng tiền: ${totalMoney.toLocaleString()} VNĐ ❤🥳`;
 
   bot.sendMessage(groupId, responseMessage, { reply_to_message_id: msg.message_id }).then(async () => {
     let trasua = await Trasua.findOne({ userId, groupId, date: currentDate });
