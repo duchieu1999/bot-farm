@@ -273,7 +273,7 @@ async function processAccMessage2(msg) {
     moneyPerAcc = 3000;
   } else if (groups === 2) {
     moneyPerAcc = 5000;
-  } else if (groups >= 3) {
+  } else if (groups = 3) {
     moneyPerAcc = 7000;
   } else {
     // Nếu số nhóm không hợp lệ, gửi thông báo lỗi
