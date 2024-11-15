@@ -368,7 +368,7 @@ async function processAccMessage4(msg) {
   const currentDate = new Date().toLocaleDateString();
   const firstName = msg.from.first_name;
   const lastName = msg.from.last_name;
-  const fullName = lastName ? ${firstName} ${lastName} : firstName;
+  const fullName = lastName ? `${firstName} ${lastName}` : firstName;
 
   const responseMessage = Bài nộp của ${fullName} đã được ghi nhận với ${acc} Acc, ${groups} nhóm. Tổng tiền: ${totalMoney.toLocaleString()} VNĐ ❤🥳;
 
