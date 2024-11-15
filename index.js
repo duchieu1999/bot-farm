@@ -951,10 +951,11 @@ bot.on('message', async (msg) => {
   if (!EXCLUDED_CHAT_IDS.includes(chatId)) {
     const messageContent = msg.text || msg.caption;
 
-    // Nếu tin nhắn chứa '@' thì không kiểm tra bài nộp
-    if (messageContent && messageContent.includes('@')) {
-      return;
-    }
+    // Nếu tin nhắn chứa '@', '[', ']', hoặc '/' thì không kiểm tra bài nộp
+if (messageContent && /[@\[\]\/]/.test(messageContent)) {
+    return;
+}
+
     
     if (messageContent) {
       if (regex.test(messageContent)) {
