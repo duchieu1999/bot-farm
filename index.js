@@ -266,7 +266,7 @@ async function processAccMessage2(msg) {
     return;
   }
 
-  // Tính tiền dựa trên số nhóm
+   // Tính tiền dựa trên số nhóm
   let moneyPerAcc = 0;
   if (groups === 1) {
     moneyPerAcc = 3000;
