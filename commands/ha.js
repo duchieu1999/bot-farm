@@ -20,10 +20,11 @@ module.exports = (bot) => {
 
         const formattedDate = targetDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
 
-        const groupIds = [-1002247863313, -1002303292016];
+        const groupIds = [-1002247863313, -1002303292016, -1002499533124];
         const groupNames = {
             "-1002247863313": "NHÓM HÀ 11H30 -14H-19H30-21H:",
-            "-1002303292016": "NHÓM HÀ 11H30, 19H30:"
+            "-1002303292016": "NHÓM HÀ 11H30, 19H30:",
+            "-1002499533124": "NHÓM HÀ PANLEN:"
         };
 
         let responseMessage = `BẢNG CÔNG ${dateLabel} - ${formattedDate}\n\n`;
