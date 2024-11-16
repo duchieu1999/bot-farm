@@ -477,119 +477,92 @@ async function processAccMessage4(msg) {
 
 
 
-bot.onText(/\/ma/, async (msg) => {
+
+
+
+//nhóm 5 ngày
+const accRegex6 = /(\d+).*?acc/i; // Regex chỉ tìm số acc mà không cần từ "xong"
+const billRegex = /(\d+).*?bill/i; // Regex tìm số bill
+
+// Đăng ký sự kiện cho bot
+bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
-  await sendAggregatedData4(chatId);
+
+  // Chỉ kiểm tra nếu là nhóm có ID
+  if (chatId == -1002143712364) {
+
+    // Kiểm tra nếu tin nhắn chứa từ khóa "(số) acc" hoặc "(số) bill"
+    const messageContent = msg.text || msg.caption;
+    if (messageContent) {
+      if (accRegex6.test(messageContent) || billRegex.test(messageContent)) {
+        await processAccMessage6(msg); // Gọi hàm xử lý tin nhắn
+      } else {
+        // Báo lỗi cú pháp
+        bot.sendMessage(chatId, 'Bạn nộp sai cú pháp, hãy ghi đúng như sau: Số Acc làm, số Bill lên. Ví dụ: 1 acc 1 bill hoặc 1 acc', { reply_to_message_id: msg.message_id });
+      }
+    }
+  }
 });
 
-async function sendAggregatedData4(chatId) {
-  try {
-    // Tính thời gian từ 9h sáng hôm qua đến 9h sáng hôm nay theo giờ Việt Nam (UTC+7)
-    const now = new Date();
+async function processAccMessage6(msg) {
+  const messageContent = msg.text || msg.caption;
+  const accMatches = messageContent.match(accRegex6);
+  const billMatches = messageContent.match(billRegex);
+  const userId = msg.from.id;
+  const groupId = msg.chat.id;
 
-    // Tính startTime là 9h sáng ngày hôm qua (UTC+7)
-    const startTime = new Date(now);
-    startTime.setDate(now.getDate() - 2);    // Giảm một ngày
-    startTime.setHours(2, 0, 0, 0);          // Đặt giờ là 9:00:00 (UTC+7)
+  let acc = 0;
+  let bill = 0;
 
-    // Tính endTime là 9h sáng hôm nay (UTC+7)
-    const endTime = new Date(now);
-    endTime.setHours(2, 0, 0, 0);            // Đặt giờ là 9:00:00 hôm nay (UTC+7)
-
-    // Chuyển thời gian sang UTC để tương thích với MongoDB (vì MongoDB thường lưu trữ thời gian theo UTC)
-    const startTimeUTC = new Date(startTime.getTime() - (7 * 60 * 60 * 1000)); // Trừ 7 giờ để có UTC
-    const endTimeUTC = new Date(endTime.getTime() - (7 * 60 * 60 * 1000));     // Trừ 7 giờ để có UTC
-
-    // Lấy bảng công từ khoảng thời gian này, loại trừ nhóm có chatId -1002108234982
-    const bangCongs = await BangCong2.find({
-      date: { $gte: startTimeUTC, $lte: endTimeUTC },
-      groupId: { $ne: -1002108234982 }, // Loại trừ nhóm này
-    });
-
-    if (bangCongs.length === 0) {
-      bot.sendMessage(chatId, `Không có bảng công nào từ 9h sáng hôm qua đến 9h sáng hôm nay (${startTime.toLocaleDateString()} - ${endTime.toLocaleDateString()}).`);
-      return;
-    }
-
-    // Tạo bảng công phân loại theo ID nhóm
-    const groupedByGroupId = {};
-    bangCongs.forEach((bangCong) => {
-      const groupId = bangCong.groupId ? bangCong.groupId.toString() : '';
-      if (!groupedByGroupId[groupId]) {
-        groupedByGroupId[groupId] = [];
-      }
-      groupedByGroupId[groupId].push(bangCong);
-    });
-
-    let response = '';
-
-    // Tạo bảng công cho mỗi nhóm và kiểm tra xem user ID 5867504772 có trong nhóm hay không
-    for (const groupId in groupedByGroupId) {
-      if (!groupId) {
-        continue;
-      }
-
-      // Kiểm tra xem user 5867504772 có trong nhóm không
-      let isUserInGroup = false;
-      try {
-        const chatMembers = await bot.getChatMember(groupId, 5867504772);
-        if (chatMembers && (chatMembers.status === 'member' || chatMembers.status === 'administrator' || chatMembers.status === 'creator')) {
-          isUserInGroup = true;
-        }
-      } catch (error) {
-        console.error(`Không thể lấy thông tin thành viên của nhóm ${groupId}:`, error);
-      }
-
-      if (!isUserInGroup) {
-        continue; // Bỏ qua nhóm nếu user không có trong nhóm
-      }
-
-      const groupData = groupedByGroupId[groupId];
-
-      // Lấy thông tin nhóm từ Telegram API
-      let groupName;
-      try {
-        const chatInfo = await bot.getChat(groupId);
-        groupName = chatInfo.title || `Nhóm ${groupId}`;
-      } catch (error) {
-        console.error(`Không thể lấy thông tin nhóm ${groupId}:`, error);
-        groupName = `Nhóm ${groupId}`;
-      }
-
-      response += `Bảng công nhóm ${groupName} (${startTime.toLocaleDateString()} - ${endTime.toLocaleDateString()}):\n\n`;
-
-      let totalGroupMoney = 0;
-
-      groupData.forEach((bangCong) => {
-        if (bangCong.tinh_tien !== undefined) {
-          const formattedTien = bangCong.tinh_tien.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-          response += `${bangCong.ten}\t\t${bangCong.quay}q +\t${bangCong.keo}c\t${formattedTien}vnđ\n`;
-          totalGroupMoney += bangCong.tinh_tien;
-        }
-      });
-
-      const formattedTotal = totalGroupMoney.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-      response += `Tổng tiền: ${formattedTotal}vnđ\n\n`;
-    }
-
-    // Kiểm tra độ dài response và gửi tin nhắn
-    if (response.length > 4000) {
-      const middle = Math.floor(response.length / 2);
-      const splitIndex = response.lastIndexOf('\n', middle);
-
-      const firstPart = response.substring(0, splitIndex).trim();
-      const secondPart = response.substring(splitIndex).trim();
-
-      bot.sendMessage(chatId, firstPart);
-      bot.sendMessage(chatId, secondPart);
-    } else {
-      bot.sendMessage(chatId, response.trim());
-    }
-  } catch (error) {
-    console.error('Lỗi khi truy vấn dữ liệu từ MongoDB:', error);
-    bot.sendMessage(chatId, 'Đã xảy ra lỗi khi truy vấn dữ liệu từ cơ sở dữ liệu.');
+  if (accMatches) {
+    acc = parseInt(accMatches[1]); // Lấy số acc từ nhóm bắt được
   }
+  
+  if (billMatches) {
+    bill = parseInt(billMatches[1]); // Lấy số bill từ nhóm bắt được
+  }
+
+  // Nếu số acc lớn hơn 20, gửi thông báo nghịch linh tinh và không xử lý tiếp
+  if (acc > 30) {
+    bot.sendMessage(groupId, 'Nộp gian lận là xấu tính 😕', { reply_to_message_id: msg.message_id });
+    return;
+  }
+
+  const currentDate = new Date().toLocaleDateString();
+  const firstName = msg.from.first_name;
+  const lastName = msg.from.last_name;
+  const fullName = lastName ? `${firstName} ${lastName}` : firstName;
+
+  let totalMoney = acc * 5000; // Tính tiền cho số Acc
+  let billMoney = bill * 0; // Tính tiền cho số Bill
+  totalMoney += billMoney; // Cộng tiền từ bill vào tổng tiền
+
+  const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${acc} Acc và ${bill} Bill đang chờ kiểm tra ❤🥳`;
+
+  bot.sendMessage(groupId, responseMessage, { reply_to_message_id: msg.message_id }).then(async () => {
+    let trasua = await Trasua.findOne({ userId, groupId, date: currentDate });
+
+    if (!trasua) {
+      trasua = await Trasua.create({
+        userId,
+        groupId,
+        date: currentDate,
+        ten: fullName,
+        acc,
+        bill,
+        tinh_tien: totalMoney,
+      });
+    } else {
+      trasua.acc += acc;
+      trasua.bill += bill;
+      trasua.tinh_tien += totalMoney;
+      await trasua.save();
+    }
+  });
 }
+
+
+
 
 
 
@@ -684,95 +657,6 @@ bot.onText(/\/13h/, async (msg) => {
   });
 });
 
-
-
-
-
-bot.onText(/\/khoiphuc/, async (msg) => {
-  const chatId = msg.chat.id;
-
-  // Danh sách các groupId cần xóa
-  const groupIdsToDelete = [-1002247863313, -1002303292016];
-
-  try {
-    // Xóa tất cả các bản ghi có groupId nằm trong danh sách
-    const result = await Trasua.deleteMany({ groupId: { $in: groupIdsToDelete } });
-
-    // Gửi tin nhắn thông báo về số lượng bản ghi đã bị xóa
-    bot.sendMessage(chatId, `Đã xóa ${result.deletedCount} bản ghi bảng công từ các nhóm có groupId: -1002247863313, -1002303292016.`);
-  } catch (error) {
-    // Thông báo lỗi nếu có sự cố xảy ra
-    bot.sendMessage(chatId, `Đã xảy ra lỗi khi xóa dữ liệu: ${error.message}`);
-  }
-});
-
-    
-
-// Lệnh /giam để giảm 50% tiền bảng công cho các thành viên
-bot.onText(/\/giam/, async (msg) => {
-  const chatId = msg.chat.id;
-  const groupId = -1002128975957; // Sử dụng groupId theo yêu cầu
-
-  // Lấy tất cả các bản ghi bảng công theo groupId
-  const bangCongList = await Trasua.find({ groupId });
-  if (bangCongList.length === 0) {
-    bot.sendMessage(chatId, 'Chưa có bảng công nào được ghi nhận.');
-    return;
-  }
-
-  // Tạo đối tượng để phân chia bảng công theo ngày và tổng hợp tiền và acc cho mỗi thành viên
-  const bangCongByMember = {};
-
-  bangCongList.forEach(entry => {
-    const date = new Date(entry.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
-
-    // Nếu thành viên chưa tồn tại trong bảng, khởi tạo
-    if (!bangCongByMember[entry.ten]) {
-      bangCongByMember[entry.ten] = {
-        totalAcc: 0,
-        totalMoney: 0,
-        records: {},
-      };
-    }
-
-    // Nếu ngày chưa tồn tại cho thành viên, khởi tạo
-    if (!bangCongByMember[entry.ten].records[date]) {
-      bangCongByMember[entry.ten].records[date] = {
-        acc: 0,
-        tinh_tien: 0,
-      };
-    }
-
-    // Cộng dồn acc và tiền cho ngày và tổng, giảm 50% tiền
-    bangCongByMember[entry.ten].records[date].acc += entry.acc;
-    bangCongByMember[entry.ten].records[date].tinh_tien += entry.tinh_tien * 0.5;
-    bangCongByMember[entry.ten].totalAcc += entry.acc;
-    bangCongByMember[entry.ten].totalMoney += entry.tinh_tien * 0.5;
-  });
-
-  // Tạo thông báo kết quả
-  let responseMessage = `BẢNG CÔNG NHÓM "LAN LAN 19H" (GIẢM 50% TIỀN)\n\n`;
-  let totalMoney = 0;
-
-  // Duyệt qua từng thành viên để hiển thị thông tin
-  Object.keys(bangCongByMember).forEach(ten => {
-    const member = bangCongByMember[ten];
-    responseMessage += `${ten}:\n`;
-
-    // Hiển thị bảng công phân theo ngày
-    Object.keys(member.records).forEach(date => {
-      const record = member.records[date];
-      responseMessage += `  Ngày ${date}: ${record.acc} Acc - ${record.tinh_tien.toLocaleString()} VNĐ\n`;
-    });
-
-    responseMessage += `  Tổng Acc: ${member.totalAcc} - Tổng tiền: ${member.totalMoney.toLocaleString()} VNĐ\n\n`;
-    totalMoney += member.totalMoney;
-  });
-
-  responseMessage += `TỔNG TIỀN CẢ NHÓM (GIẢM 50%): ${totalMoney.toLocaleString()} VNĐ`;
-
-  bot.sendMessage(chatId, responseMessage);
-});
 
 
 
@@ -1023,7 +907,7 @@ const EXCLUDED_CHAT_IDS = [
   -1002103270166, -1002397067352, -1002312409314,
   -1002336524767, -1002295387259, -1002128975957,
   -1002247863313, -1002192201870, -1002499533124,
-  -1002303292016, -1002128975957
+  -1002303292016, -1002128975957, -1002143712364
 ];
 
 bot.on('message', async (msg) => {
@@ -1662,27 +1546,6 @@ async function deleteOldData() {
 
 
 
-// Xử lý lệnh /delca
-bot.onText(/\/delca/, async (msg) => {
-  const chatId = msg.chat.id;
-
-  try {
-    // Xóa tất cả các bản ghi VipCard
-    const result = await VipCard.deleteMany({});
-
-    if (result.deletedCount > 0) {
-      bot.sendMessage(chatId, `Đã xóa thành công ${result.deletedCount} bản ghi VipCard. 😊`);
-    } else {
-      bot.sendMessage(chatId, "Không có bản ghi nào để xóa. 😕");
-    }
-  } catch (error) {
-    bot.sendMessage(chatId, "Có lỗi xảy ra khi xóa các bản ghi. 😓");
-    console.error("Error deleting VipCards:", error);
-  }
-});
-
-
-
 
 // Lệnh /reset để xóa bảng công của những ngày trước
 bot.onText(/\/reset/, async (msg) => {
@@ -1878,7 +1741,7 @@ bot.onText(/\/bangcong2/, async (msg) => {
     const currentDate = new Date().toLocaleDateString();
 
     // Tìm tất cả bảng công cho nhóm -1002050799248
-    const bangCongs = await BangCong2.find({ groupId: -1002108234982 });
+    const bangCongs = await BangCong2.find({ groupId: -1002143712364 });
 
     if (bangCongs.length === 0) {
       bot.sendMessage(chatId, "Không có bảng công nào cho nhóm Be truly rich");
@@ -2223,37 +2086,7 @@ function parseGroupCodes(text) {
   return text.split(',').map(code => code.trim().toLowerCase());
 }
 
-// Lệnh /tempo: bỏ qua bảng công các nhóm
-bot.onText(/\/tempo\s+\[([^\]]+)\]/, (msg, match) => {
-  const chatId = msg.chat.id;
-  const groupCodesToExclude = parseGroupCodes(match[1]);
 
-  excludedGroups = groupCodesToExclude.map(code => groupCodes[code]);
-  bot.sendMessage(chatId, `Đã bỏ qua bảng công các nhóm: ${groupCodesToExclude.join(', ')}`);
-});
-
-// Lệnh /add: thêm bảng công các nhóm từ ngày/tháng cụ thể
-bot.onText(/\/add\s+\[([^\]]+)\]\s+(\d{1,2})\/(\d{1,2})/, (msg, match) => {
-  const chatId = msg.chat.id;
-  const groupCodesToAdd = parseGroupCodes(match[1]);
-  const day = parseInt(match[2]);
-  const month = parseInt(match[3]);
-
-  const dateStr = `${day}/${month}`;
-
-  if (!additionalGroupsByDate[dateStr]) {
-    additionalGroupsByDate[dateStr] = [];
-  }
-
-  groupCodesToAdd.forEach(code => {
-    const groupId = groupCodes[code];
-    if (!additionalGroupsByDate[dateStr].includes(groupId)) {
-      additionalGroupsByDate[dateStr].push(groupId);
-    }
-  });
-
-  bot.sendMessage(chatId, `Đã ghi nhớ các nhóm: ${groupCodesToAdd.join(', ')} ngày ${dateStr} sẽ được tính thêm`);
-});
 
  // Cập nhật tự động tên nhóm vào đối tượng groups
 bot.on('message', (msg) => {
