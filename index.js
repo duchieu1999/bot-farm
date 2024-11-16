@@ -819,6 +819,86 @@ bot.onText(/Bỏ/, async (msg) => {
 });
 
 
+// Lệnh /bc2 để xem bảng công từng ngày
+bot.onText(/\/nhom5k/, async (msg) => {
+  const chatId = msg.chat.id;
+
+  try {
+    const currentDate = new Date();
+
+    // Tính 3 ngày gần nhất
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(currentDate.getDate() - 3);
+
+    // Tìm tất cả bảng công trong nhóm và giới hạn 3 ngày gần nhất
+    const bangCongs = await BangCong2.find({
+      groupId: -1002143712364,
+      date: { $gte: threeDaysAgo.toLocaleDateString() }, // Chỉ lấy từ ngày 3 ngày trước
+    });
+
+    if (bangCongs.length === 0) {
+      bot.sendMessage(chatId, "Không có bảng công nào cho nhóm Be truly rich trong 3 ngày gần nhất.");
+      return;
+    }
+
+    // Phân loại bảng công theo ngày
+    const groupedByDate = {};
+    bangCongs.forEach((bangCong) => {
+      const date = bangCong.date;
+      if (!groupedByDate[date]) {
+        groupedByDate[date] = [];
+      }
+      groupedByDate[date].push(bangCong);
+    });
+
+    let response = '';
+
+    // Tạo bảng công cho từng ngày
+    for (const date in groupedByDate) {
+      const dayData = groupedByDate[date];
+      response += `Bảng công ngày ${date}:\n\n`;
+
+      dayData.forEach((bangCong) => {
+        const formattedTien = bangCong.tinh_tien.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        response += `${bangCong.ten}\t\t${bangCong.acc} Acc\t${formattedTien}vnđ\n`;
+      });
+
+      response += '\n';
+    }
+
+    // Tính tổng số tiền của từng thành viên
+    const totalByMember = {};
+    bangCongs.forEach((bangCong) => {
+      if (!totalByMember[bangCong.ten]) {
+        totalByMember[bangCong.ten] = { acc: 0, tinh_tien: 0 };
+      }
+      totalByMember[bangCong.ten].acc += bangCong.acc;
+      totalByMember[bangCong.ten].tinh_tien += bangCong.tinh_tien;
+    });
+
+    response += 'Bảng tổng số tiền và số Acc của từng thành viên:\n\n';
+    let totalSum = 0;
+    for (const member in totalByMember) {
+      const memberData = totalByMember[member];
+      const formattedTotal = memberData.tinh_tien.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+      response += `${member}: ${memberData.acc} Acc\t${formattedTotal}vnđ\n`;
+      totalSum += memberData.tinh_tien;
+    }
+
+    // Tính tổng số tiền của tất cả thành viên
+    const formattedTotalSum = totalSum.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    response += `\nTổng số tiền của tất cả thành viên: ${formattedTotalSum}vnđ\n`;
+
+    bot.sendMessage(chatId, response.trim());
+  } catch (error) {
+    console.error('Lỗi khi truy vấn bảng công:', error);
+    bot.sendMessage(chatId, 'Đã xảy ra lỗi khi truy vấn bảng công. Vui lòng thử lại.');
+  }
+});
+
+
+
+
 
 bot.onText(/delete/, async (msg) => {
   if (!msg.reply_to_message || !msg.reply_to_message.text) {
