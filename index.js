@@ -396,7 +396,7 @@ async function processAccMessage5(msg) {
 
 //nhóm 5 ngày
 const accRegex4 = /(\d+).*?acc/i; // Regex chỉ tìm số acc mà không cần từ "xong"
-const billRegex = /(\d+).*?bill/i; // Regex tìm số bill
+const billRegex4 = /(\d+).*?bill/i; // Regex tìm số bill
 
 // Đăng ký sự kiện cho bot
 bot.on('message', async (msg) => {
@@ -408,7 +408,7 @@ bot.on('message', async (msg) => {
     // Kiểm tra nếu tin nhắn chứa từ khóa "(số) acc" hoặc "(số) bill"
     const messageContent = msg.text || msg.caption;
     if (messageContent) {
-      if (accRegex4.test(messageContent) || billRegex.test(messageContent)) {
+      if (accRegex4.test(messageContent) || billRegex4.test(messageContent)) {
         await processAccMessage4(msg); // Gọi hàm xử lý tin nhắn
       } else {
         // Báo lỗi cú pháp
@@ -421,7 +421,7 @@ bot.on('message', async (msg) => {
 async function processAccMessage4(msg) {
   const messageContent = msg.text || msg.caption;
   const accMatches = messageContent.match(accRegex4);
-  const billMatches = messageContent.match(billRegex);
+  const billMatches = messageContent.match(billRegex4);
   const userId = msg.from.id;
   const groupId = msg.chat.id;
 
