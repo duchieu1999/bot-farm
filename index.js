@@ -480,9 +480,8 @@ async function processAccMessage4(msg) {
 
 
 
-//nhóm 5 ngày
+// Nhóm 5 ngày
 const accRegex6 = /(\d+).*?acc/i; // Regex chỉ tìm số acc mà không cần từ "xong"
-const billRegex = /(\d+).*?bill/i; // Regex tìm số bill
 
 // Đăng ký sự kiện cho bot
 bot.on('message', async (msg) => {
@@ -490,15 +489,14 @@ bot.on('message', async (msg) => {
 
   // Chỉ kiểm tra nếu là nhóm có ID
   if (chatId == -1002143712364) {
-
-    // Kiểm tra nếu tin nhắn chứa từ khóa "(số) acc" hoặc "(số) bill"
+    // Kiểm tra nếu tin nhắn chứa từ khóa "(số) acc"
     const messageContent = msg.text || msg.caption;
     if (messageContent) {
-      if (accRegex6.test(messageContent) || billRegex.test(messageContent)) {
+      if (accRegex6.test(messageContent)) {
         await processAccMessage6(msg); // Gọi hàm xử lý tin nhắn
       } else {
         // Báo lỗi cú pháp
-        bot.sendMessage(chatId, 'Bạn nộp sai cú pháp, hãy ghi đúng như sau: Số Acc làm, số Bill lên. Ví dụ: 1 acc 1 bill hoặc 1 acc', { reply_to_message_id: msg.message_id });
+        bot.sendMessage(chatId, 'Bạn nộp sai cú pháp, hãy ghi đúng như sau: Số Acc làm. Ví dụ: 1 acc', { reply_to_message_id: msg.message_id });
       }
     }
   }
@@ -507,22 +505,16 @@ bot.on('message', async (msg) => {
 async function processAccMessage6(msg) {
   const messageContent = msg.text || msg.caption;
   const accMatches = messageContent.match(accRegex6);
-  const billMatches = messageContent.match(billRegex);
   const userId = msg.from.id;
   const groupId = msg.chat.id;
 
   let acc = 0;
-  let bill = 0;
 
   if (accMatches) {
     acc = parseInt(accMatches[1]); // Lấy số acc từ nhóm bắt được
   }
-  
-  if (billMatches) {
-    bill = parseInt(billMatches[1]); // Lấy số bill từ nhóm bắt được
-  }
 
-  // Nếu số acc lớn hơn 20, gửi thông báo nghịch linh tinh và không xử lý tiếp
+  // Nếu số acc lớn hơn 30, gửi thông báo nghịch linh tinh và không xử lý tiếp
   if (acc > 30) {
     bot.sendMessage(groupId, 'Nộp gian lận là xấu tính 😕', { reply_to_message_id: msg.message_id });
     return;
@@ -534,10 +526,9 @@ async function processAccMessage6(msg) {
   const fullName = lastName ? `${firstName} ${lastName}` : firstName;
 
   let totalMoney = acc * 5000; // Tính tiền cho số Acc
-  let billMoney = bill * 0; // Tính tiền cho số Bill
-  totalMoney += billMoney; // Cộng tiền từ bill vào tổng tiền
+  const formattedMoney = totalMoney.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
 
-  const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${acc} Acc và ${bill} Bill đang chờ kiểm tra ❤🥳`;
+  const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${acc} Acc đang chờ kiểm tra ❤🥳.\nTổng tiền: +${formattedMoney}`;
 
   bot.sendMessage(groupId, responseMessage, { reply_to_message_id: msg.message_id }).then(async () => {
     let trasua = await Trasua.findOne({ userId, groupId, date: currentDate });
@@ -549,12 +540,10 @@ async function processAccMessage6(msg) {
         date: currentDate,
         ten: fullName,
         acc,
-        bill,
         tinh_tien: totalMoney,
       });
     } else {
       trasua.acc += acc;
-      trasua.bill += bill;
       trasua.tinh_tien += totalMoney;
       await trasua.save();
     }
@@ -562,6 +551,108 @@ async function processAccMessage6(msg) {
 }
 
 
+
+bot.onText(/\/333/, async (msg) => {
+  const chatId = msg.chat.id;
+
+  // Tạo danh sách ngày từ hôm nay đến 2 ngày trước
+  const dates = [];
+  for (let i = 0; i < 3; i++) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    dates.push(date.toLocaleDateString());
+  }
+
+  const groupName = 'BẢNG CÔNG BOSS HICC';
+  const url = 'https://quickchart.io/graphviz?format=png&layout=dot&graph=';
+  let grandTotal = 0; // Tổng tiền của 3 ngày
+  const dailyImages = []; // Mảng lưu URL ảnh của từng ngày
+
+  for (const [index, dateStr] of dates.entries()) {
+    const bangCongList = await Trasua.find({ groupId: -1002143712364, date: dateStr });
+
+    if (bangCongList.length === 0) {
+      // Nếu không có bảng công, thêm thông báo cho ngày đó
+      bot.sendMessage(chatId, `Chưa có bảng công nào được ghi nhận trong ngày ${dateStr}.`);
+      continue;
+    }
+
+    let totalAmount = 50000; // Tiền quản lý
+    let content = bangCongList.map(entry => `${entry.ten}\t${entry.acc}\t${entry.tinh_tien.toLocaleString()} vnđ`).join('\n');
+
+    // Tính tổng tiền công
+    bangCongList.forEach(entry => {
+      totalAmount += entry.tinh_tien;
+    });
+
+    // Cộng vào tổng tiền 3 ngày
+    grandTotal += totalAmount;
+
+    // Chuẩn bị URL của QuickChart với cấu trúc bảng
+    const graph = `
+      digraph G {
+        node [shape=plaintext];
+        a [label=<
+          <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" STYLE="font-family: 'Arial', sans-serif; border: 1px solid black;">
+            <TR><TD COLSPAN="4" ALIGN="CENTER" BGCOLOR="#FFCC00" STYLE="font-size: 16px; font-weight: bold;">${groupName} - ${dateStr}</TD></TR>
+            <TR STYLE="font-weight: bold; background-color: #FFCC00;">
+              <TD ALIGN="CENTER">Tên</TD>
+              <TD ALIGN="CENTER">Acc</TD>
+              <TD ALIGN="CENTER">Tiền công</TD>
+            </TR>
+            ${content.split('\n').map(line => `<TR><TD ALIGN="LEFT" STYLE="font-weight: bold;">${line.split('\t').join('</TD><TD ALIGN="CENTER">')}</TD></TR>`).join('')}
+            <TR STYLE="font-weight: bold;">
+              <TD COLSPAN="2" ALIGN="LEFT">Quản lý</TD>
+              <TD ALIGN="CENTER">50,000 vnđ</TD>
+            </TR>
+            <TR STYLE="font-weight: bold;">
+              <TD COLSPAN="2" ALIGN="LEFT">Tổng số tiền</TD>
+              <TD ALIGN="CENTER">${totalAmount.toLocaleString()} vnđ</TD>
+            </TR>
+          </TABLE>
+        >];
+      }
+    `;
+    
+    const imageUrl = `${url}${encodeURIComponent(graph)}`;
+    dailyImages.push({ dateStr, imageUrl });
+  }
+
+  // Gửi từng bảng công
+  for (const { dateStr, imageUrl } of dailyImages) {
+    await bot.sendPhoto(chatId, imageUrl, {
+      caption: `Bảng Công Nhóm "${groupName}" Ngày ${dateStr}`,
+    });
+  }
+
+  // Tạo ảnh tổng kết tổng tiền 3 ngày
+  const totalGraph = `
+    digraph G {
+      node [shape=plaintext];
+      a [label=<
+        <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" STYLE="font-family: 'Arial', sans-serif; border: 1px solid black;">
+          <TR><TD COLSPAN="2" ALIGN="CENTER" BGCOLOR="#FFCC00" STYLE="font-size: 16px; font-weight: bold;">Tổng Tiền 3 Ngày</TD></TR>
+          <TR STYLE="font-weight: bold; background-color: #FFCC00;">
+            <TD ALIGN="CENTER">Ngày</TD>
+            <TD ALIGN="CENTER">Tổng Tiền</TD>
+          </TR>
+          ${dailyImages.map((_, i) => `<TR><TD ALIGN="CENTER">${dates[i]}</TD><TD ALIGN="CENTER">${(dailyImages[i]?.totalAmount || 0).toLocaleString()} vnđ</TD></TR>`).join('')}
+          <TR STYLE="font-weight: bold;">
+            <TD ALIGN="LEFT">Tổng Cộng</TD>
+            <TD ALIGN="CENTER">${grandTotal.toLocaleString()} vnđ</TD>
+          </TR>
+        </TABLE>
+      >];
+    }
+  `;
+
+  const totalImageUrl = `${url}${encodeURIComponent(totalGraph)}`;
+
+  // Gửi ảnh tổng tiền 3 ngày
+  await bot.sendPhoto(chatId, totalImageUrl, {
+    caption: `Tổng Kết Tiền Công Trong 3 Ngày`,
+  });
+});
 
 
 
@@ -1602,14 +1693,14 @@ const groupNames = {
 // Tự động xóa bảng công từ 2 ngày trước vào 0h mỗi ngày
 cron.schedule('0 0 * * *', async () => {
   await deleteOldData();
-  console.log('Đã xóa các bản ghi bảng công từ 2 ngày trước và cũ hơn.');
+  console.log('Đã xóa các bản ghi bảng công từ 5 ngày trước và cũ hơn.');
 });
 
 async function deleteOldData() {
   try {
     // Tính ngày hôm kia
     const dayBeforeYesterday = new Date();
-    dayBeforeYesterday.setDate(dayBeforeYesterday.getDate() - 2);
+    dayBeforeYesterday.setDate(dayBeforeYesterday.getDate() - 5);
     const endOfDayBeforeYesterday = new Date(dayBeforeYesterday.setHours(23, 59, 59, 999));
 
     // Xóa tất cả dữ liệu bảng công từ ngày hôm kia và các ngày trước đó
@@ -1666,7 +1757,7 @@ bot.onText(/\/edit (.+)/, async (msg, match) => {
     }
 
     // Kiểm tra xem người dùng có quyền sử dụng lệnh
-    if (username === 'Donghieu23') {
+    if (username === 'Hieu_ga') {
         // Người dùng này luôn có quyền sử dụng lệnh
     } else {
         const chatMember = await bot.getChatMember(chatId, userId);
@@ -2579,22 +2670,22 @@ function getRankEmoji(level) {
   if (level >= 21 && level <= 23) return '🧛🏻';
   if (level >= 24 && level <= 26) return '🥷';
   if (level >= 27 && level <= 29) return '🧙‍♂️';
-  if (level >= 30 && level <= 33) return '💀';
+  if (level >= 30 && level <= 33) return '👹';
   if (level >= 34 && level <= 37) return '🕯🪦🕯';
   if (level >= 38 && level <= 41) return '🧟‍♀️🦇';
-  if (level >= 42 && level <= 46) return '👹';
+  if (level >= 42 && level <= 46) return '💀';
   if (level >= 47 && level <= 52) return '˚˖𓍢ִִ໋🌊🦈˚˖𓍢ִ✧˚';
   if (level >= 53 && level <= 55) return '💠VIP💠';
   if (level >= 56 && level <= 59) return '💎VIP💎';
   if (level >= 60 && level <= 64) return '🪩VIP🪩';
   if (level >= 65 && level <= 67) return '🩻VIP🩻';
   if (level >= 68 && level <= 70) return '🪬VIP🪬୧⍤⃝💐';
-  if (level >= 71 & level <= 73) return '🥉CHIẾN THẦN⚔️🛡';
-  if (level >= 74 & level <= 76) return '🥈Á THẦN🐉⚜️';
-  if (level >= 77 & level <= 79) return '🪙VÔ ĐỊCH🐲👸';
-  if (level >= 80) return '👑 HUYỀN THOẠI🦋⃟🥀™️';
+  if (level >= 71 & level <= 81) return '🥉CHIẾN THẦN⚔️🛡';
+  if (level >= 82 & level <= 92) return '🥈Á THẦN🐉⚜️';
+  if (level >= 93 & level <= 101) return '🪙VÔ ĐỊCH🐲👸';
+  if (level >= 102) return '👑 HUYỀN THOẠI🦋⃟🥀™️';
 
-  if (level >= 100) return 'ﮩ٨ـﮩﮩ٨ـ🫀ﮩ٨ـﮩﮩ٨ـ🔑';
+  if (level >= 1000) return 'ﮩ٨ـﮩﮩ٨ـ🫀ﮩ٨ـﮩﮩ٨ـ🔑';
   return '';
 }
 
@@ -2620,26 +2711,7 @@ const replyKeyboard4 = {
   }
 };
 
-bot.onText(/\/update/, async (msg) => {
-  const chatId = msg.chat.id;
-  
-  try {
-    const members = await Member.find({});
-    if (!members.length) {
-      bot.sendMessage(chatId, 'Không tìm thấy thành viên nào.');
-      return;
-    }
 
-    for (let member of members) {
-      bot.sendMessage(member.userId, 'Đã Cập nhật phiên bản mới hãy cập nhật thông tin của bạn:', replyKeyboard4);
-    }
-
-    bot.sendMessage(chatId, 'Đã gửi thông báo cập nhật cho tất cả thành viên.');
-  } catch (error) {
-    console.error('Lỗi khi gửi thông báo cập nhật:', error);
-    bot.sendMessage(chatId, 'Đã xảy ra lỗi khi gửi thông báo cập nhật.');
-  }
-});
 
 
 
@@ -2732,7 +2804,7 @@ bot.on('message', async (msg) => {
     console.log(`Unauthorized group detected: ${chatId}`);
     try {
       // Gửi tin nhắn cảnh báo vào nhóm
-      await bot.sendMessage(chatId, "Cha mẹ đứa nào add tao vào nhóm đấy xin phép anh Hieu Gà chưa @duchieu287");
+      await bot.sendMessage(chatId, "Cha mẹ đứa nào add tao vào nhóm đấy xin phép anh Hieu Gà chưa @Hieu_ga");
     } catch (error) {
       console.error(`Failed to send warning message to ${chatId}:`, error);
     }
@@ -3541,59 +3613,6 @@ const replyKeyboard = {
   }
 };
 
-
-
-// Xử lý lệnh "/bup" để xóa hết dữ liệu trong schema Member
-bot.onText(/\/bup/, async (msg) => {
-  const userId = msg.from.id;
-
-  try {
-    // Kiểm tra quyền hạn của người dùng
-    // Thêm điều kiện kiểm tra quyền hạn ở đây nếu cần thiết
-
-    // Xóa hết dữ liệu từ schema Member
-    await Message.deleteMany({});
-    bot.sendMessage(msg.chat.id, 'Đã xóa hết dữ liệu từ schema Member.');
-  } catch (error) {
-    console.error('Lỗi khi xóa dữ liệu từ schema Member:', error);
-    bot.sendMessage(msg.chat.id, 'Đã xảy ra lỗi khi xóa dữ liệu từ schema Member.');
-  }
-});
-
-
-
-
-
-// Lắng nghe lệnh /thongbao
-bot.onText(/\/thongbao "(.*)" "(.*)"/, (msg, match) => {
-  const chatId = msg.chat.id;
-  const username = msg.from.username;
-
-  // Chỉ cho phép username @duchieu287 thực hiện lệnh này
-  if (username !== 'Duchieu287') {
-    bot.sendMessage(chatId, 'Bạn không có quyền sử dụng lệnh này.');
-    return;
-  }
-  // Định nghĩa groupId mà thông báo sẽ được gửi đến
-const groupId = -1002103270166;
-  // Lấy tên tính năng và nội dung thông báo từ lệnh
-  const featureName = match[1];
-  const notificationContent = match[2];
-  const currentDate = moment().format('DD/MM/YYYY');
-
-  // Định dạng thông báo
-  const message = `TÍNH NĂNG MỚI 🔵:\nLần cập nhật gần đây: ${currentDate}\n${featureName}\nNội dung cập nhật:\n${notificationContent}`;
-
-  // Gửi thông báo đến groupId
-  bot.sendMessage(groupId, message)
-    .then(() => {
-      bot.sendMessage(chatId, 'Thông báo đã được gửi thành công.');
-    })
-    .catch((error) => {
-      console.error('Lỗi khi gửi thông báo:', error);
-      bot.sendMessage(chatId, 'Có lỗi xảy ra khi gửi thông báo.');
-    });
-});
 
 
 
