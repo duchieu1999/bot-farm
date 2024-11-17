@@ -552,7 +552,7 @@ async function processAccMessage6(msg) {
 
 
 
-bot.onText(/\/333/, async (msg) => {
+bot.onText(/\/13h/, async (msg) => {
   const chatId = msg.chat.id;
 
   // Tạo danh sách ngày từ hôm nay đến 2 ngày trước
@@ -563,13 +563,13 @@ bot.onText(/\/333/, async (msg) => {
     dates.push(date.toLocaleDateString());
   }
 
-  const groupName = 'BẢNG CÔNG BOSS HICC';
+  const groupName = 'LAN LAN 19H';
   const url = 'https://quickchart.io/graphviz?format=png&layout=dot&graph=';
   let grandTotal = 0; // Tổng tiền của 3 ngày
-  const dailyImages = []; // Mảng lưu URL ảnh của từng ngày
+  const dailyImages = []; // Mảng lưu URL ảnh của từng ngày và tổng tiền
 
-  for (const [index, dateStr] of dates.entries()) {
-    const bangCongList = await Trasua.find({ groupId: -1002143712364, date: dateStr });
+  for (const dateStr of dates) {
+    const bangCongList = await Trasua.find({ groupId: -1002336524767, date: dateStr });
 
     if (bangCongList.length === 0) {
       // Nếu không có bảng công, thêm thông báo cho ngày đó
@@ -615,7 +615,7 @@ bot.onText(/\/333/, async (msg) => {
     `;
     
     const imageUrl = `${url}${encodeURIComponent(graph)}`;
-    dailyImages.push({ dateStr, imageUrl });
+    dailyImages.push({ dateStr, imageUrl, totalAmount }); // Lưu totalAmount cho ngày này
   }
 
   // Gửi từng bảng công
@@ -636,7 +636,7 @@ bot.onText(/\/333/, async (msg) => {
             <TD ALIGN="CENTER">Ngày</TD>
             <TD ALIGN="CENTER">Tổng Tiền</TD>
           </TR>
-          ${dailyImages.map((_, i) => `<TR><TD ALIGN="CENTER">${dates[i]}</TD><TD ALIGN="CENTER">${(dailyImages[i]?.totalAmount || 0).toLocaleString()} vnđ</TD></TR>`).join('')}
+          ${dailyImages.map(({ dateStr, totalAmount }) => `<TR><TD ALIGN="CENTER">${dateStr}</TD><TD ALIGN="CENTER">${totalAmount.toLocaleString()} vnđ</TD></TR>`).join('')}
           <TR STYLE="font-weight: bold;">
             <TD ALIGN="LEFT">Tổng Cộng</TD>
             <TD ALIGN="CENTER">${grandTotal.toLocaleString()} vnđ</TD>
@@ -653,6 +653,7 @@ bot.onText(/\/333/, async (msg) => {
     caption: `Tổng Kết Tiền Công Trong 3 Ngày`,
   });
 });
+
 
 
 
