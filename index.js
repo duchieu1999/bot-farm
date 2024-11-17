@@ -552,7 +552,7 @@ async function processAccMessage6(msg) {
 
 
 
-bot.onText(/\/13h/, async (msg) => {
+bot.onText(/\/333/, async (msg) => {
   const chatId = msg.chat.id;
 
   // Tạo danh sách ngày từ hôm nay đến 2 ngày trước
