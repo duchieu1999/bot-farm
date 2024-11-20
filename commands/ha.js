@@ -23,7 +23,7 @@ module.exports = (bot) => {
 
         // Định nghĩa thông tin nhóm
         const groupNames = {
-            "-1002247863313": "NHÓM HÀ 11H30 -14H-19H30-21H:",
+            "-1002247863313": "NHÓM HÀ QUẨY ZALO BIN:",
             "-1002303292016": "NHÓM HÀ 11H30, 19H30:",
             "-1002499533124": "NHÓM HÀ PANLEN:"
         };
