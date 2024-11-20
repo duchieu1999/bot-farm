@@ -269,7 +269,7 @@ async function processAccMessage2(msg) {
    // Tính tiền dựa trên số nhóm
   let moneyPerAcc = 0;
   if (groups === 1) {
-    moneyPerAcc = 3000;
+    moneyPerAcc = 6000;
   } else if (groups === 2) {
     moneyPerAcc = 5000;
   } else if (groups >= 3) {
@@ -549,6 +549,80 @@ async function processAccMessage6(msg) {
     }
   });
 }
+
+
+
+
+// Nhóm 5 ngày
+const accRegex7 = /(\d+).*?acc/i; // Regex chỉ tìm số acc mà không cần từ "xong"
+
+// Đăng ký sự kiện cho bot
+bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
+
+  // Chỉ kiểm tra nếu là nhóm có ID
+  if (chatId == -1002247863313) {
+    // Kiểm tra nếu tin nhắn chứa từ khóa "(số) acc"
+    const messageContent = msg.text || msg.caption;
+    if (messageContent) {
+      if (accRegex7.test(messageContent)) {
+        await processAccMessage7(msg); // Gọi hàm xử lý tin nhắn
+      } else {
+        // Báo lỗi cú pháp
+        bot.sendMessage(chatId, 'Bạn nộp sai cú pháp, hãy ghi đúng như sau: Số Acc làm. Ví dụ: 1 acc', { reply_to_message_id: msg.message_id });
+      }
+    }
+  }
+});
+
+async function processAccMessage7(msg) {
+  const messageContent = msg.text || msg.caption;
+  const accMatches = messageContent.match(accRegex7);
+  const userId = msg.from.id;
+  const groupId = msg.chat.id;
+
+  let acc = 0;
+
+  if (accMatches) {
+    acc = parseInt(accMatches[1]); // Lấy số acc từ nhóm bắt được
+  }
+
+  // Nếu số acc lớn hơn 30, gửi thông báo nghịch linh tinh và không xử lý tiếp
+  if (acc > 30) {
+    bot.sendMessage(groupId, 'Nộp gian lận là xấu tính 😕', { reply_to_message_id: msg.message_id });
+    return;
+  }
+
+  const currentDate = new Date().toLocaleDateString();
+  const firstName = msg.from.first_name;
+  const lastName = msg.from.last_name;
+  const fullName = lastName ? `${firstName} ${lastName}` : firstName;
+
+  let totalMoney = acc * 6000; // Tính tiền cho số Acc
+  const formattedMoney = totalMoney.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
+
+  const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${acc} Acc đang chờ kiểm tra ❤🥳.\nTổng tiền: +${formattedMoney}`;
+
+  bot.sendMessage(groupId, responseMessage, { reply_to_message_id: msg.message_id }).then(async () => {
+    let trasua = await Trasua.findOne({ userId, groupId, date: currentDate });
+
+    if (!trasua) {
+      trasua = await Trasua.create({
+        userId,
+        groupId,
+        date: currentDate,
+        ten: fullName,
+        acc,
+        tinh_tien: totalMoney,
+      });
+    } else {
+      trasua.acc += acc;
+      trasua.tinh_tien += totalMoney;
+      await trasua.save();
+    }
+  });
+}
+
 
 
 
