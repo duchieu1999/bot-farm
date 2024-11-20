@@ -239,7 +239,7 @@ bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
 
   // Chỉ kiểm tra nếu là nhóm có ID
-  if (chatId == -1002247863313 || chatId == -1002303292016) {
+  if (chatId == -1002303292016) {
 
     // Kiểm tra nếu tin nhắn chứa từ khóa "xong (số) acc (số) nhóm"
     const messageContent = msg.text || msg.caption;
@@ -269,7 +269,7 @@ async function processAccMessage2(msg) {
    // Tính tiền dựa trên số nhóm
   let moneyPerAcc = 0;
   if (groups === 1) {
-    moneyPerAcc = 6000;
+    moneyPerAcc = 3000;
   } else if (groups === 2) {
     moneyPerAcc = 5000;
   } else if (groups >= 3) {
