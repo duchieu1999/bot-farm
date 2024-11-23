@@ -566,19 +566,21 @@ bot.on('message', async (msg) => {
 
   // Chỉ kiểm tra nếu là nhóm có ID
   if (chatId == -1002247863313) {
-    // Kiểm tra nếu tin nhắn chứa từ khóa "(số) acc"
+    // Lấy nội dung tin nhắn
     const messageContent = msg.text || msg.caption;
+
     if (messageContent) {
-      if (accRegex7.test(messageContent)) {
-        await processAccMessage7(msg); // Gọi hàm xử lý tin nhắn
-      } 
-      // else {
-      //   // Báo lỗi cú pháp
-      //   bot.sendMessage(chatId, 'Bạn nộp sai cú pháp, hãy ghi đúng như sau: Số Acc làm. Ví dụ: 1 acc', { reply_to_message_id: msg.message_id });
-      // }
+      // Kiểm tra nếu tin nhắn chứa từ "Xong" (không phân biệt hoa thường)
+      if (/xong/i.test(messageContent)) {
+        // Kiểm tra nếu tin nhắn chứa số acc hợp lệ
+        if (accRegex7.test(messageContent)) {
+          await processAccMessage7(msg); // Gọi hàm xử lý tin nhắn
+        }
+      }
     }
   }
 });
+
 
 
 async function processAccMessage7(msg) {
