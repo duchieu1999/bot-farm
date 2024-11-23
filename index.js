@@ -480,8 +480,7 @@ async function processAccMessage4(msg) {
 
 
 
-// Nhóm 5 ngày
-const accRegex6 = /(\d+).*?acc/i; // Regex chỉ tìm số acc mà không cần từ "xong"
+const accRegex6 = /(\d+)\s*[^a-zA-Z\d]*acc\b/gi; // Tìm tất cả số đứng ngay trước từ "acc"
 
 // Đăng ký sự kiện cho bot
 bot.on('message', async (msg) => {
@@ -489,11 +488,12 @@ bot.on('message', async (msg) => {
 
   // Chỉ kiểm tra nếu là nhóm có ID
   if (chatId == -1002143712364) {
-    // Kiểm tra nếu tin nhắn chứa từ khóa "(số) acc"
     const messageContent = msg.text || msg.caption;
     if (messageContent) {
-      if (accRegex6.test(messageContent)) {
-        await processAccMessage6(msg); // Gọi hàm xử lý tin nhắn
+      // Kiểm tra xem có số acc hợp lệ không
+      const accMatches = [...messageContent.matchAll(accRegex6)]; // Tìm tất cả các số acc hợp lệ
+      if (accMatches.length > 0) {
+        await processAccMessage6(msg, accMatches); // Gọi hàm xử lý tin nhắn với danh sách acc
       } else {
         // Báo lỗi cú pháp
         bot.sendMessage(chatId, 'Bạn nộp sai cú pháp, hãy ghi đúng như sau: Số Acc làm. Ví dụ: 1 acc', { reply_to_message_id: msg.message_id });
@@ -502,20 +502,15 @@ bot.on('message', async (msg) => {
   }
 });
 
-async function processAccMessage6(msg) {
-  const messageContent = msg.text || msg.caption;
-  const accMatches = messageContent.match(accRegex6);
+async function processAccMessage6(msg, accMatches) {
   const userId = msg.from.id;
   const groupId = msg.chat.id;
 
-  let acc = 0;
+  // Tổng hợp tất cả số acc
+  let totalAcc = accMatches.reduce((sum, match) => sum + parseInt(match[1]), 0);
 
-  if (accMatches) {
-    acc = parseInt(accMatches[1]); // Lấy số acc từ nhóm bắt được
-  }
-
-  // Nếu số acc lớn hơn 30, gửi thông báo nghịch linh tinh và không xử lý tiếp
-  if (acc > 30) {
+  // Nếu tổng số acc lớn hơn 30, gửi thông báo nghịch linh tinh và không xử lý tiếp
+  if (totalAcc > 30) {
     bot.sendMessage(groupId, 'Nộp gian lận là xấu tính 😕', { reply_to_message_id: msg.message_id });
     return;
   }
@@ -525,10 +520,10 @@ async function processAccMessage6(msg) {
   const lastName = msg.from.last_name;
   const fullName = lastName ? `${firstName} ${lastName}` : firstName;
 
-  let totalMoney = acc * 5000; // Tính tiền cho số Acc
+  let totalMoney = totalAcc * 5000; // Tính tiền cho tổng số Acc
   const formattedMoney = totalMoney.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
 
-  const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${acc} Acc đang chờ kiểm tra ❤🥳.\nTổng tiền: +${formattedMoney}`;
+  const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${totalAcc} Acc đang chờ kiểm tra ❤🥳.\nTổng tiền: +${formattedMoney}`;
 
   bot.sendMessage(groupId, responseMessage, { reply_to_message_id: msg.message_id }).then(async () => {
     let trasua = await Trasua.findOne({ userId, groupId, date: currentDate });
@@ -539,11 +534,11 @@ async function processAccMessage6(msg) {
         groupId,
         date: currentDate,
         ten: fullName,
-        acc,
+        acc: totalAcc,
         tinh_tien: totalMoney,
       });
     } else {
-      trasua.acc += acc;
+      trasua.acc += totalAcc;
       trasua.tinh_tien += totalMoney;
       await trasua.save();
     }
@@ -553,10 +548,10 @@ async function processAccMessage6(msg) {
 
 
 
+
 // Nhóm 5 ngày
 const accRegex7 = /(\d+).*?acc/i; // Regex chỉ tìm số acc mà không cần từ "xong"
 
-// Đăng ký sự kiện cho bot
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
 
@@ -567,13 +562,15 @@ bot.on('message', async (msg) => {
     if (messageContent) {
       if (accRegex7.test(messageContent)) {
         await processAccMessage7(msg); // Gọi hàm xử lý tin nhắn
-      } else {
-        // Báo lỗi cú pháp
-        bot.sendMessage(chatId, 'Bạn nộp sai cú pháp, hãy ghi đúng như sau: Số Acc làm. Ví dụ: 1 acc', { reply_to_message_id: msg.message_id });
-      }
+      } 
+      // else {
+      //   // Báo lỗi cú pháp
+      //   bot.sendMessage(chatId, 'Bạn nộp sai cú pháp, hãy ghi đúng như sau: Số Acc làm. Ví dụ: 1 acc', { reply_to_message_id: msg.message_id });
+      // }
     }
   }
 });
+
 
 async function processAccMessage7(msg) {
   const messageContent = msg.text || msg.caption;
@@ -598,7 +595,7 @@ async function processAccMessage7(msg) {
   const lastName = msg.from.last_name;
   const fullName = lastName ? `${firstName} ${lastName}` : firstName;
 
-  let totalMoney = acc * 6000; // Tính tiền cho số Acc
+  let totalMoney = acc * 4000; // Tính tiền cho số Acc
   const formattedMoney = totalMoney.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
 
   const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${acc} Acc đang chờ kiểm tra ❤🥳.\nTổng tiền: +${formattedMoney}`;
@@ -935,35 +932,48 @@ bot.onText(/Bỏ/, async (msg) => {
 
   const replyText = msg.reply_to_message.text;
 
-  // Regex để bắt hai loại tin nhắn khác nhau
-  const matched = replyText.match(/Bài nộp của (.+) đã được ghi nhận với (\d+) Acc, (\d+) nhóm. Tổng tiền: ([\d,]+) VNĐ/) ||
-                  replyText.match(/Bài nộp của (.+) đã được ghi nhận với (\d+) Acc đang chờ kiểm tra/);
+  // Regex để bắt số acc và số tiền từ tin nhắn
+  const regex = /(\d+)\s*[^a-zA-Z\d]*acc\b.*?(\d{1,3}(?:\.\d{3})*(?:,\d{3})*)/gi;
 
-  if (!matched) {
-    bot.sendMessage(chatId, 'Tin nhắn trả lời không đúng định dạng xác nhận của bot.');
+  const matches = [...replyText.matchAll(regex)];
+
+  if (matches.length === 0) {
+    bot.sendMessage(chatId, 'Tin nhắn trả lời không đúng định dạng hoặc không chứa số Acc và số tiền hợp lệ.');
     return;
   }
 
-  const ten = matched[1].trim();
-  const acc = parseInt(matched[2]);
-  const nhom = matched[3] ? parseInt(matched[3]) : 0; // Nếu không có nhóm, mặc định là 0
-  let tinh_tien = matched[4] ? parseInt(matched[4].replace(/,/g, '')) : 0; // Nếu không có tổng tiền, mặc định là 0
+  let totalAcc = 0;
+  let totalMoney = 0;
 
-  // Nếu không có tổng tiền và nhóm, trừ 2700 VNĐ cho mỗi acc
-  if (!matched[3] && !matched[4]) {
-    tinh_tien = acc * 2700;
-  }
+  // Duyệt qua các kết quả tìm được
+  matches.forEach((match) => {
+    const acc = parseInt(match[1]); // Số acc
+    const money = parseInt(match[2].replace(/\./g, '').replace(/,/g, '')); // Số tiền (xóa dấu phân cách)
+    totalAcc += acc;
+    totalMoney += money;
+  });
 
   // Lấy ngày từ tin nhắn của bot và định dạng là tháng/ngày/năm
   const messageDate = new Date(msg.reply_to_message.date * 1000);
   const formattedDate = `${messageDate.getMonth() + 1}/${messageDate.getDate()}/${messageDate.getFullYear()}`;
 
   try {
-    const regex = new RegExp(normalizeName(ten).split('').join('.*'), 'i');
+    // Lấy tên người dùng từ tin nhắn xác nhận của bot
+    const nameRegex = /Bài nộp của (.+?)\b/;
+    const nameMatch = replyText.match(nameRegex);
 
+    if (!nameMatch) {
+      bot.sendMessage(chatId, 'Không tìm thấy tên trong tin nhắn xác nhận.');
+      return;
+    }
+
+    const ten = nameMatch[1].trim();
+    const regexName = new RegExp(normalizeName(ten).split('').join('.*'), 'i');
+
+    // Tìm bản ghi trong cơ sở dữ liệu
     const trasua = await Trasua.findOne({
       groupId: chatId,
-      ten: { $regex: regex },
+      ten: { $regex: regexName },
       date: formattedDate
     });
 
@@ -973,19 +983,22 @@ bot.onText(/Bỏ/, async (msg) => {
     }
 
     // Cập nhật bản ghi
-    trasua.acc -= acc;
-    trasua.nhom -= nhom;
-    trasua.tinh_tien -= tinh_tien;
+    trasua.acc -= totalAcc;
+    trasua.tinh_tien -= totalMoney;
 
     // Lưu bản ghi đã cập nhật
     await trasua.save();
 
-    bot.sendMessage(chatId, `Trừ thành công bài nộp này cho ${ten}. Acc: -${acc}, Nhóm: -${nhom}, Tiền: -${tinh_tien.toLocaleString()} VNĐ`);
+    bot.sendMessage(
+      chatId,
+      `Trừ thành công bài nộp này cho ${ten}:\n- Acc: -${totalAcc}\n- Tiền: -${totalMoney.toLocaleString('vi-VN')} VNĐ`
+    );
   } catch (error) {
     console.error('Lỗi khi cập nhật dữ liệu:', error);
     bot.sendMessage(chatId, 'Đã xảy ra lỗi khi cập nhật dữ liệu.');
   }
 });
+
 
 
 // Lệnh /bc2 để xem bảng công từng ngày
