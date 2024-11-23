@@ -232,7 +232,10 @@ cron.schedule('0 0 * * *', async () => {
 
     
 
-const accRegex2 = /xong\s*(\d+)\s*acc\s*(\d+)\s*nhóm/i;
+
+
+
+const accRegex3 = /xong\s*(\d+)\s*acc\s*(\d+)\s*nhóm/i;
 
 // Đăng ký sự kiện cho bot
 bot.on('message', async (msg) => {
@@ -244,14 +247,14 @@ bot.on('message', async (msg) => {
     // Kiểm tra nếu tin nhắn chứa từ khóa "xong (số) acc (số) nhóm"
     const messageContent = msg.text || msg.caption;
     if (messageContent && /xong\s*\d+\s*acc\s*\d+\s*nhóm/gi.test(messageContent)) {
-      await processAccMessage2(msg); // Gọi hàm xử lý tin nhắn
+      await processAccMessage3(msg); // Gọi hàm xử lý tin nhắn
     }
   }
 });
 
-async function processAccMessage2(msg) {
+async function processAccMessage3(msg) {
   const messageContent = msg.text || msg.caption;
-  const accMatches = messageContent.match(accRegex2);
+  const accMatches = messageContent.match(accRegex3);
   const userId = msg.from.id;
   const groupId = msg.chat.id;
 
@@ -269,11 +272,11 @@ async function processAccMessage2(msg) {
    // Tính tiền dựa trên số nhóm
   let moneyPerAcc = 0;
   if (groups === 1) {
-    moneyPerAcc = 3000;
+    moneyPerAcc = 2000;
   } else if (groups === 2) {
-    moneyPerAcc = 5000;
+    moneyPerAcc = 4000;
   } else if (groups >= 3) {
-    moneyPerAcc = 7000;
+    moneyPerAcc = 6000;
   } else {
     // Nếu số nhóm không hợp lệ, gửi thông báo lỗi
     bot.sendMessage(groupId, 'Số nhóm phải từ 1 đến 3 thôi nhé! 😅', { reply_to_message_id: msg.message_id });
@@ -309,6 +312,7 @@ async function processAccMessage2(msg) {
     }
   });
 }
+
 
 
 
