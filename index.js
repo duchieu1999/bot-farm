@@ -930,12 +930,12 @@ bot.onText(/\/han(homnay|homqua)/, async (msg, match) => {
 
 
 // Regex để bắt số acc và số tiền
-const accRegex12 = /(\d+)\s*[^a-zA-Z\d]*acc\b/gi;  // Bắt số acc
-const moneyRegex = /[+]?(\d{1,3}(?:[.,]\d{3})*)\s*(?:₫|VNĐ|đ)?/gi; // Bắt số tiền
+const accRegex11 = /(\d+)\s*[^a-zA-Z\d]*acc\b/gi;  // Bắt số acc
+const moneyRegex = /[+]?(\d+(?:[.,]\d{3})*)/gi; // Bắt số tiền, bỏ đơn vị tiền
 
 bot.onText(/Bỏ/, async (msg) => {
   if (!msg.reply_to_message || !msg.reply_to_message.text) {
-    bot.sendMessage(msg.chat.id, 'Hãy trả lời vào đúng tin nhắn xác nhận của bot để cập nhật.');
+    bot.sendMessage(msg.chat.id, 'Hãy trả lời lệnh từ tin nhắn ghi nhận bài nộp của bot để có thể trừ được bài nộp.');
     return;
   }
 
@@ -945,21 +945,25 @@ bot.onText(/Bỏ/, async (msg) => {
   const replyText = msg.reply_to_message.text;
 
   // Tìm số acc trong tin nhắn
-  const accMatches = [...replyText.matchAll(accRegex12)];
+  const accMatches = [...replyText.matchAll(accRegex11)];
   if (accMatches.length === 0) {
     bot.sendMessage(chatId, 'Không tìm thấy thông tin số acc trong tin nhắn.');
     return;
   }
   const acc = parseInt(accMatches[0][1]);
 
-  // Tìm số tiền trong tin nhắn
-  const moneyMatches = [...replyText.matchAll(moneyRegex)];
-  if (moneyMatches.length === 0) {
+  // Tìm số tiền trong tin nhắn và xử lý
+  let tinh_tien = 0;
+  const moneyMatches = replyText.match(moneyRegex);
+  if (moneyMatches) {
+    // Lấy số cuối cùng trong danh sách (thường là tổng tiền)
+    const moneyStr = moneyMatches[moneyMatches.length - 1];
+    // Loại bỏ dấu phân cách hàng nghìn và chuyển thành số
+    tinh_tien = parseInt(moneyStr.replace(/[.,]/g, ''));
+  } else {
     bot.sendMessage(chatId, 'Không tìm thấy thông tin số tiền trong tin nhắn.');
     return;
   }
-  // Lấy số tiền và chuyển đổi sang số
-  const tinh_tien = parseInt(moneyMatches[0][1].replace(/[.,]/g, ''));
 
   // Tìm tên người dùng
   const tenMatch = replyText.match(/Bài nộp của ([^đ]+) đã được/);
