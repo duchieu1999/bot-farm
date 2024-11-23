@@ -920,6 +920,10 @@ bot.onText(/\/han(homnay|homqua)/, async (msg, match) => {
 });
 
 
+// Regex để bắt số acc và số tiền
+const accRegex12 = /(\d+)\s*[^a-zA-Z\d]*acc\b/gi;  // Bắt số acc
+const moneyRegex = /[+]?(\d{1,3}(?:[.,]\d{3})*)\s*(?:₫|VNĐ|đ)?/gi; // Bắt số tiền
+
 bot.onText(/Bỏ/, async (msg) => {
   if (!msg.reply_to_message || !msg.reply_to_message.text) {
     bot.sendMessage(msg.chat.id, 'Hãy trả lời vào đúng tin nhắn xác nhận của bot để cập nhật.');
@@ -927,51 +931,46 @@ bot.onText(/Bỏ/, async (msg) => {
   }
 
   const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const username = msg.from.username;
   const replyText = msg.reply_to_message.text;
 
-  // Regex để bắt số acc và số tiền
-  const accMoneyRegex = /(\d+)\s*[^a-zA-Z\d]*acc\b.*?([\d.]+)/gi;
-
-  // Tìm tất cả các kết quả khớp
-  const matches = [...replyText.matchAll(accMoneyRegex)];
-
-  if (matches.length === 0) {
-    bot.sendMessage(chatId, 'Tin nhắn trả lời không đúng định dạng hoặc không chứa số Acc và số tiền hợp lệ.');
+  // Tìm số acc trong tin nhắn
+  const accMatches = [...replyText.matchAll(accRegex12)];
+  if (accMatches.length === 0) {
+    bot.sendMessage(chatId, 'Không tìm thấy thông tin số acc trong tin nhắn.');
     return;
   }
+  const acc = parseInt(accMatches[0][1]);
 
-  let totalAcc = 0;
-  let totalMoney = 0;
+  // Tìm số tiền trong tin nhắn
+  const moneyMatches = [...replyText.matchAll(moneyRegex)];
+  if (moneyMatches.length === 0) {
+    bot.sendMessage(chatId, 'Không tìm thấy thông tin số tiền trong tin nhắn.');
+    return;
+  }
+  // Lấy số tiền và chuyển đổi sang số
+  const tinh_tien = parseInt(moneyMatches[0][1].replace(/[.,]/g, ''));
 
-  matches.forEach((match) => {
-    const acc = parseInt(match[1]); // Bắt số acc
-    const money = parseInt(match[2].replace(/\./g, '').replace(/,/g, '')); // Chuyển số tiền về dạng số
-    totalAcc += acc;
-    totalMoney += money;
-  });
+  // Tìm tên người dùng
+  const tenMatch = replyText.match(/Bài nộp của ([^đ]+) đã được/);
+  if (!tenMatch) {
+    bot.sendMessage(chatId, 'Không tìm thấy tên người dùng trong tin nhắn.');
+    return;
+  }
+  const ten = tenMatch[1].trim();
 
-  // Lấy ngày từ tin nhắn xác nhận của bot
+  // Lấy ngày từ tin nhắn của bot và định dạng
   const messageDate = new Date(msg.reply_to_message.date * 1000);
   const formattedDate = `${messageDate.getMonth() + 1}/${messageDate.getDate()}/${messageDate.getFullYear()}`;
 
   try {
-    // Tìm tên người dùng từ tin nhắn
-    const nameRegex = /Bài nộp của (.+?)\b/;
-    const nameMatch = replyText.match(nameRegex);
+    const regex = new RegExp(normalizeName(ten).split('').join('.*'), 'i');
 
-    if (!nameMatch) {
-      bot.sendMessage(chatId, 'Không tìm thấy tên trong tin nhắn xác nhận.');
-      return;
-    }
-
-    const ten = nameMatch[1].trim();
-    const regexName = new RegExp(normalizeName(ten).split('').join('.*'), 'i');
-
-    // Tìm bản ghi trong cơ sở dữ liệu
     const trasua = await Trasua.findOne({
       groupId: chatId,
-      ten: { $regex: regexName },
-      date: formattedDate,
+      ten: { $regex: regex },
+      date: formattedDate
     });
 
     if (!trasua) {
@@ -980,22 +979,18 @@ bot.onText(/Bỏ/, async (msg) => {
     }
 
     // Cập nhật bản ghi
-    trasua.acc -= totalAcc;
-    trasua.tinh_tien -= totalMoney;
+    trasua.acc -= acc;
+    trasua.tinh_tien -= tinh_tien;
 
     // Lưu bản ghi đã cập nhật
     await trasua.save();
 
-    bot.sendMessage(
-      chatId,
-      `Trừ thành công bài nộp này cho ${ten}:\n- Acc: -${totalAcc}\n- Tiền: -${totalMoney.toLocaleString('vi-VN')} ₫`
-    );
+    bot.sendMessage(chatId, `Trừ thành công cho ${ten}: Acc: -${acc}, Tiền: -${tinh_tien.toLocaleString()} VNĐ`);
   } catch (error) {
     console.error('Lỗi khi cập nhật dữ liệu:', error);
     bot.sendMessage(chatId, 'Đã xảy ra lỗi khi cập nhật dữ liệu.');
   }
 });
-
 
 
 
