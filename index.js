@@ -927,15 +927,13 @@ bot.onText(/Bỏ/, async (msg) => {
   }
 
   const chatId = msg.chat.id;
-  const userId = msg.from.id;
-  const username = msg.from.username;
-
   const replyText = msg.reply_to_message.text;
 
-  // Regex để bắt số acc và số tiền từ tin nhắn
-  const regex = /(\d+)\s*[^a-zA-Z\d]*acc\b.*?(\d{1,3}(?:\.\d{3})*(?:,\d{3})*)/gi;
+  // Regex để bắt số acc và số tiền
+  const accMoneyRegex = /(\d+)\s*[^a-zA-Z\d]*acc\b.*?([\d.]+)/gi;
 
-  const matches = [...replyText.matchAll(regex)];
+  // Tìm tất cả các kết quả khớp
+  const matches = [...replyText.matchAll(accMoneyRegex)];
 
   if (matches.length === 0) {
     bot.sendMessage(chatId, 'Tin nhắn trả lời không đúng định dạng hoặc không chứa số Acc và số tiền hợp lệ.');
@@ -945,20 +943,19 @@ bot.onText(/Bỏ/, async (msg) => {
   let totalAcc = 0;
   let totalMoney = 0;
 
-  // Duyệt qua các kết quả tìm được
   matches.forEach((match) => {
-    const acc = parseInt(match[1]); // Số acc
-    const money = parseInt(match[2].replace(/\./g, '').replace(/,/g, '')); // Số tiền (xóa dấu phân cách)
+    const acc = parseInt(match[1]); // Bắt số acc
+    const money = parseInt(match[2].replace(/\./g, '').replace(/,/g, '')); // Chuyển số tiền về dạng số
     totalAcc += acc;
     totalMoney += money;
   });
 
-  // Lấy ngày từ tin nhắn của bot và định dạng là tháng/ngày/năm
+  // Lấy ngày từ tin nhắn xác nhận của bot
   const messageDate = new Date(msg.reply_to_message.date * 1000);
   const formattedDate = `${messageDate.getMonth() + 1}/${messageDate.getDate()}/${messageDate.getFullYear()}`;
 
   try {
-    // Lấy tên người dùng từ tin nhắn xác nhận của bot
+    // Tìm tên người dùng từ tin nhắn
     const nameRegex = /Bài nộp của (.+?)\b/;
     const nameMatch = replyText.match(nameRegex);
 
@@ -974,7 +971,7 @@ bot.onText(/Bỏ/, async (msg) => {
     const trasua = await Trasua.findOne({
       groupId: chatId,
       ten: { $regex: regexName },
-      date: formattedDate
+      date: formattedDate,
     });
 
     if (!trasua) {
@@ -991,13 +988,14 @@ bot.onText(/Bỏ/, async (msg) => {
 
     bot.sendMessage(
       chatId,
-      `Trừ thành công bài nộp này cho ${ten}:\n- Acc: -${totalAcc}\n- Tiền: -${totalMoney.toLocaleString('vi-VN')} VNĐ`
+      `Trừ thành công bài nộp này cho ${ten}:\n- Acc: -${totalAcc}\n- Tiền: -${totalMoney.toLocaleString('vi-VN')} ₫`
     );
   } catch (error) {
     console.error('Lỗi khi cập nhật dữ liệu:', error);
     bot.sendMessage(chatId, 'Đã xảy ra lỗi khi cập nhật dữ liệu.');
   }
 });
+
 
 
 
