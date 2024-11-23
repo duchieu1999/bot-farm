@@ -490,17 +490,26 @@ bot.on('message', async (msg) => {
   if (chatId == -1002143712364) {
     const messageContent = msg.text || msg.caption;
     if (messageContent) {
+      // Kiểm tra nếu tin nhắn chứa từ "bỏ" (không phân biệt hoa thường)
+      const containsBo = /bỏ/gi.test(messageContent);
+
+      if (containsBo) {
+        // Nếu chứa từ "bỏ", không báo lỗi cú pháp
+        return;
+      }
+
       // Kiểm tra xem có số acc hợp lệ không
       const accMatches = [...messageContent.matchAll(accRegex6)]; // Tìm tất cả các số acc hợp lệ
       if (accMatches.length > 0) {
         await processAccMessage6(msg, accMatches); // Gọi hàm xử lý tin nhắn với danh sách acc
       } else {
         // Báo lỗi cú pháp
-        bot.sendMessage(chatId, 'Bạn nộp sai cú pháp, hãy ghi đúng như sau: Số Acc làm. Ví dụ: 1 acc', { reply_to_message_id: msg.message_id });
+        bot.sendMessage(chatId, 'Bạn nộp hoặc lệnh trừ bỏ sai cú pháp, hãy ghi đúng như sau: Số Acc làm. Ví dụ: 1 acc. Cú pháo để trừ bài nộp có chứa só acc là: Bỏ', { reply_to_message_id: msg.message_id });
       }
     }
   }
 });
+
 
 async function processAccMessage6(msg, accMatches) {
   const userId = msg.from.id;
