@@ -2020,11 +2020,17 @@ const timeSlots = [
   { time: '9:30', label: 'ca 9h30' },
   { time: '11:30', label: 'ca 11h30' },
   { time: '14:30', label: 'ca 14h30' }, 
-  { time: '17:33', label: 'ca 18h00' },
+  { time: '17:44', label: 'ca 18h00' },
   { time: '19:30', label: 'ca 19h30' }
 ];
 
-const groupId = -1002333438294;
+const groupId = -1002392685048; 
+const adminIds = [7305842707]; // Thêm ID của admin vào đây
+
+let billImagesCount = 0;
+let billImages = [];
+let upBillMembers = [];
+let isWaitingForBills = false;
 
 schedule.scheduleJob('0 0 * * *', async () => {
   await Attendance.deleteMany({});
@@ -2038,18 +2044,44 @@ timeSlots.forEach((slot, index) => {
     const label = slot.label;
     const currentCa = `ca_${index + 1}`;
 
+    // Reset biến cho ca mới
+    billImagesCount = 0;
+    billImages = [];
+    upBillMembers = [];
+    isWaitingForBills = false;
+
     const attendance = new Attendance({ ca: currentCa, memberData: new Map() });
     await attendance.save();
 
     bot.sendMessage(groupId, `🔔 Điểm danh ${label}! Mọi người báo số thứ tự của mình nào!`);
 
-    let billImagesCount = 0;
-    let billImages = [];
-    const upBillMembers = [];
-
     const listener = bot.on('message', async (msg) => {
       if (msg.chat.id !== groupId) return;
 
+      // Xử lý ảnh bill từ admin
+      if (isWaitingForBills && msg.photo && adminIds.includes(msg.from.id)) {
+        const photoId = msg.photo[msg.photo.length - 1].file_id;
+        billImages.push({
+          photoId: photoId,
+          caption: msg.caption || ''
+        });
+        billImagesCount++;
+
+        if (billImagesCount === 3) {
+          // Gửi ảnh bill cho từng thành viên
+          for (let i = 0; i < Math.min(3, upBillMembers.length); i++) {
+            const member = upBillMembers[i];
+            await bot.sendPhoto(groupId, billImages[i].photoId, {
+              caption: `Bill ${label} của ${member.name} (STT: ${member.number})\nNhớ lên bill nhé!`,
+              parse_mode: 'Markdown'
+            });
+          }
+          isWaitingForBills = false;
+        }
+        return;
+      }
+
+      // Xử lý tin nhắn số thứ tự
       const text = msg.text;
       const memberName = msg.from.first_name || msg.from.username;
       const userId = msg.from.id;
@@ -2067,50 +2099,32 @@ timeSlots.forEach((slot, index) => {
           await currentAttendance.save();
           const allNumbers = Array.from(currentAttendance.memberData.values()).flat().sort((a, b) => a - b);
 
+          // Chỉ phân chia khi đủ 15 số
           if (allNumbers.length >= 15) {
             bot.sendMessage(groupId, `✅ Chốt điểm danh ${label}!`);
 
-            const { upBill, chucBillGroups } = allocateNumbers(allNumbers, currentAttendance);
+            const { upBill, chucBillGroups } = allocateNumbers(allNumbers);
             
-            let response = '🎉 *CHIA CỔ PHẦN*\n\n';
+            let response = '🎉 *PHÂN CHIA SỐ THỨ TỰ*\n\n';
             response += '*🔸 Lên Bill:*\n';
             upBill.forEach(num => {
               const owner = findOwner(num, currentAttendance);
-              upBillMembers.push({name: owner, userId: userId, number: num});
-              response += `   • STT ${num} - [${owner}](tg://user?id=${userId})\n`;
+              upBillMembers.push({name: owner, number: num});
+              response += `   • STT ${num} - ${owner}\n`;
             });
 
             response += '\n*🔸 Chúc Bill:*\n';
             chucBillGroups.forEach((group, idx) => {
-              response += `   • Bill ${idx + 1}: ${group.join(', ')}\n`;
+              if (idx < 3) { // Giới hạn tối đa 3 nhóm chúc bill
+                response += `   • Nhóm ${idx + 1}: ${group.join(', ')}\n`;
+              }
             });
 
             bot.sendMessage(groupId, response, {parse_mode: 'Markdown'});
-
-            // Lắng nghe ảnh bill từ admin
-            const billListener = bot.on('message', async (msg) => {
-              if (msg.chat.id !== groupId || !msg.photo) return;
-              
-              if (msg.from.id === adminId && billImagesCount < 3) {
-                // Lưu message_id của ảnh bill
-                billImages.push(msg.message_id);
-                billImagesCount++;
-                
-                if (billImagesCount === 3) {
-                  // Khi đã có đủ 3 ảnh, chuyển tiếp cho từng thành viên
-                  for(let i = 0; i < 3; i++) {
-                    const member = upBillMembers[i];
-                    await bot.forwardMessage(groupId, groupId, billImages[i]); // Chuyển tiếp ảnh
-                    await bot.sendMessage(groupId, 
-                      `Bill ${label} của [${member.name}](tg://user?id=${member.userId}) nhớ lên nhé`, 
-                      {parse_mode: 'Markdown'}
-                    );
-                  }
-                  
-                  bot.removeListener('message', billListener);
-                }
-              }
-            });
+            
+            // Bắt đầu chờ ảnh bill từ admin
+            isWaitingForBills = true;
+            bot.sendMessage(groupId, '📸 Admin vui lòng gửi 3 ảnh bill');
 
             bot.removeListener('message', listener);
           }
@@ -2120,19 +2134,18 @@ timeSlots.forEach((slot, index) => {
   });
 });
 
-function allocateNumbers(allNumbers, attendance) {
-  const usedNumbers = new Set();
-  const eligibleNumbers = allNumbers.filter((num) => !usedNumbers.has(num));
-
-  const shuffled = shuffleArray(eligibleNumbers);
+function allocateNumbers(allNumbers) {
+  const shuffled = shuffleArray([...allNumbers]);
   const upBill = shuffled.slice(0, 3);
+  const remaining = shuffled.slice(3);
+  
+  // Chia nhóm chúc bill, tối đa 3 nhóm
   const chucBillGroups = [];
-
-  for (let i = 3; i < shuffled.length; i += 4) {
-    chucBillGroups.push(shuffled.slice(i, i + 4));
+  const groupSize = Math.ceil(remaining.length / 3);
+  
+  for (let i = 0; i < remaining.length && chucBillGroups.length < 3; i += groupSize) {
+    chucBillGroups.push(remaining.slice(i, i + groupSize));
   }
-
-  upBill.forEach((num) => usedNumbers.add(num));
 
   return { upBill, chucBillGroups };
 }
