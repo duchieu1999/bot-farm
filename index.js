@@ -2138,17 +2138,39 @@ function findOwner(number, attendance) {
   return 'Unknown';
 }
 
-// Hàm lấy ảnh bill
-async function getBillPhotos(userId, label, upBill) {
-  const photos = []; // Dùng API Telegram để lọc các tin nhắn ảnh trong khoảng thời gian ca
+async function getBillPhotos(userId, label, upBill, bot) {
+  // Lấy lịch sử tin nhắn từ `userid` (ảnh gần nhất)
   const messages = await bot.getChatHistory(userId, { limit: 100 }); // Tải tối đa 100 tin nhắn gần nhất
-  for (const msg of messages) {
-    if (msg.photo && msg.caption?.includes(label)) {
-      photos.push(msg);
-    }
+  const photos = messages
+    .filter(msg => msg.photo && msg.caption?.includes(label))
+    .slice(0, upBill.length); // Giới hạn số lượng ảnh theo số người lên bill
+
+  if (photos.length >= upBill.length) {
+    // Nếu đủ ảnh, trả về ngay
+    return photos;
   }
-  return photos.slice(0, upBill.length); // Trả về số lượng ảnh tương ứng với số người lên bill
+
+  // Nếu không đủ ảnh, chờ ảnh mới được gửi
+  return new Promise((resolve) => {
+    bot.on('message', function listener(msg) {
+      if (msg.chat.id === userId && msg.photo) {
+        // Nếu tin nhắn là ảnh và từ đúng `userid`, thêm ảnh vào danh sách
+        photos.push(msg);
+        if (photos.length >= upBill.length) {
+          bot.removeListener('message', listener); // Gỡ listener khi đủ ảnh
+          resolve(photos);
+        }
+      }
+    });
+
+    // Timeout sau 10 phút nếu không nhận được ảnh
+    setTimeout(() => {
+      bot.removeListener('message', listener);
+      resolve(photos); // Trả về ảnh đã nhận được (dù chưa đủ)
+    }, 10 * 60 * 1000); // 10 phút
+  });
 }
+
 
 // Hàm xáo trộn mảng
 function shuffleArray(array) {
