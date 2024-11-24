@@ -2005,11 +2005,22 @@ bot.onText(/Trừ/, async (msg) => {
 
 
 
+const schedule = require('node-schedule');
+const mongoose = require('mongoose');
+const moment = require('moment-timezone');
+
+mongoose.connect('mongodb://localhost:27017/diemdanh', { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log('Kết nối MongoDB thành công!'))
+  .catch((err) => console.error('Lỗi kết nối MongoDB:', err));
+
 const attendanceSchema = new mongoose.Schema({
   ca: String,
   memberData: {
     type: Map,
-    of: [Number]
+    of: [{
+      number: Number,
+      userId: String
+    }]
   },
   createdAt: { type: Date, default: Date.now }
 });
@@ -2020,7 +2031,7 @@ const timeSlots = [
   { time: '9:30', label: 'ca 9h30' },
   { time: '11:30', label: 'ca 11h30' },
   { time: '14:30', label: 'ca 14h30' }, 
-  { time: '17:50', label: 'ca 18h00' },
+  { time: '18:01', label: 'ca 18h00' },
   { time: '19:30', label: 'ca 19h30' }
 ];
 
@@ -2031,10 +2042,17 @@ let billImagesCount = 0;
 let billImages = [];
 let upBillMembers = [];
 let isWaitingForBills = false;
+let currentCa = '';
 
-schedule.scheduleJob('0 0 * * *', async () => {
-  await Attendance.deleteMany({});
-  console.log('Dữ liệu điểm danh đã được reset!');
+bot.onText(/\/stt/, async (msg) => {
+  if (msg.chat.id === groupId) {
+    await Attendance.deleteMany({ ca: currentCa });
+    billImagesCount = 0;
+    billImages = [];
+    upBillMembers = [];
+    isWaitingForBills = false;
+    bot.sendMessage(groupId, '🔄 Đã reset dữ liệu số thứ tự của ca hiện tại!');
+  }
 });
 
 timeSlots.forEach((slot, index) => {
@@ -2042,7 +2060,7 @@ timeSlots.forEach((slot, index) => {
 
   schedule.scheduleJob({ hour, minute, tz: 'Asia/Ho_Chi_Minh' }, async () => {
     const label = slot.label;
-    const currentCa = `ca_${index + 1}`;
+    currentCa = `ca_${index + 1}`;
 
     // Reset biến cho ca mới
     billImagesCount = 0;
@@ -2055,7 +2073,7 @@ timeSlots.forEach((slot, index) => {
 
     bot.sendMessage(groupId, `🔔 Điểm danh ${label}! Mọi người báo số thứ tự của mình nào!`);
 
-    const listener = bot.on('message', async (msg) => {
+    const messageHandler = async (msg) => {
       if (msg.chat.id !== groupId) return;
 
       // Xử lý ảnh bill từ admin
@@ -2071,90 +2089,106 @@ timeSlots.forEach((slot, index) => {
           // Gửi ảnh bill cho từng thành viên
           for (let i = 0; i < Math.min(3, upBillMembers.length); i++) {
             const member = upBillMembers[i];
-            await bot.sendPhoto(groupId, billImages[i].photoId, {
-              caption: `Bill ${label} của ${member.name} (STT: ${member.number})\nNhớ lên bill nhé!`,
-              parse_mode: 'Markdown'
-            });
+            try {
+              await bot.sendPhoto(groupId, billImages[i].photoId, {
+                caption: `Bill ${label} của [${member.name}](tg://user?id=${member.userId}) - STT: ${member.number}\nNhớ lên bill nhé!`,
+                parse_mode: 'Markdown'
+              });
+            } catch (error) {
+              console.error('Lỗi gửi ảnh:', error);
+            }
           }
           isWaitingForBills = false;
+          bot.removeListener('message', messageHandler);
         }
         return;
       }
 
       // Xử lý tin nhắn số thứ tự
       const text = msg.text;
+      if (!text || !/^\d+(\s+\d+)*$/.test(text)) return;
+
       const memberName = msg.from.first_name || msg.from.username;
       const userId = msg.from.id;
+      const numbers = text.split(/\s+/).map(Number);
+      
+      const currentAttendance = await Attendance.findOne({ ca: currentCa });
+      if (!currentAttendance) return;
 
-      if (/^\d+(\s+\d+)*$/.test(text)) {
-        const numbers = text.split(/\s+/).map(Number);
-        const currentAttendance = await Attendance.findOne({ ca: currentCa });
+      // Lưu cả userId
+      currentAttendance.memberData.set(memberName, 
+        numbers.map(num => ({
+          number: num,
+          userId: userId
+        }))
+      );
 
-        if (currentAttendance) {
-          currentAttendance.memberData.set(
-            memberName, 
-            (currentAttendance.memberData.get(memberName) || []).concat(numbers)
-          );
+      await currentAttendance.save();
 
-          await currentAttendance.save();
-          const allNumbers = Array.from(currentAttendance.memberData.values()).flat().sort((a, b) => a - b);
+      // Đếm tổng số STT đã nhập
+      const allNumbers = Array.from(currentAttendance.memberData.values())
+        .flat()
+        .map(item => item.number);
 
-          // Chỉ phân chia khi đủ 15 số
-          if (allNumbers.length >= 15) {
-            bot.sendMessage(groupId, `✅ Chốt điểm danh ${label}!`);
+      // Chỉ phân chia khi đủ 15 số
+      if (allNumbers.length >= 15) {
+        bot.sendMessage(groupId, `✅ Chốt điểm danh ${label}!`);
 
-            const { upBill, chucBillGroups } = allocateNumbers(allNumbers);
-            
-            let response = '🎉 *PHÂN CHIA SỐ THỨ TỰ*\n\n';
-            response += '*🔸 Lên Bill:*\n';
-            upBill.forEach(num => {
-              const owner = findOwner(num, currentAttendance);
-              upBillMembers.push({name: owner, number: num});
-              response += `   • STT ${num} - ${owner}\n`;
-            });
+        const { upBill, chucBillGroups } = allocateNumbers(currentAttendance);
+        
+        let response = '🎉 *PHÂN CHIA SỐ THỨ TỰ*\n\n';
+        response += '*🔸 Lên Bill:*\n';
+        
+        upBill.forEach(member => {
+          upBillMembers.push(member);
+          response += `   • STT ${member.number} - [${member.name}](tg://user?id=${member.userId})\n`;
+        });
 
-            response += '\n*🔸 Chúc Bill:*\n';
-            chucBillGroups.forEach((group, idx) => {
-              if (idx < 3) { // Giới hạn tối đa 3 nhóm chúc bill
-                response += `   • Nhóm ${idx + 1}: ${group.join(', ')}\n`;
-              }
-            });
-
-            bot.sendMessage(groupId, response, {parse_mode: 'Markdown'});
-            
-            // Bắt đầu chờ ảnh bill từ admin
-            isWaitingForBills = true;
-            bot.sendMessage(groupId, '📸 Admin vui lòng gửi 3 ảnh bill');
-
-            bot.removeListener('message', listener);
+        response += '\n*🔸 Chúc Bill:*\n';
+        chucBillGroups.forEach((group, idx) => {
+          if (group.length <= 4) { // Giới hạn 4 người mỗi nhóm
+            response += `   • Bill ${idx + 1}: ${group.map(m => `${m.number}([${m.name}](tg://user?id=${m.userId}))`).join(', ')}\n`;
           }
-        }
+        });
+
+        bot.sendMessage(groupId, response, {
+          parse_mode: 'Markdown',
+          disable_web_page_preview: true
+        });
+        
+        // Bắt đầu chờ ảnh bill từ admin
+        isWaitingForBills = true;
+        bot.sendMessage(groupId, '📸 Admin vui lòng gửi 3 ảnh bill');
       }
-    });
+    };
+
+    bot.on('message', messageHandler);
   });
 });
 
-function allocateNumbers(allNumbers) {
-  const shuffled = shuffleArray([...allNumbers]);
+function allocateNumbers(attendance) {
+  const allMembers = [];
+  attendance.memberData.forEach((numbers, name) => {
+    numbers.forEach(item => {
+      allMembers.push({
+        name: name,
+        number: item.number,
+        userId: item.userId
+      });
+    });
+  });
+
+  const shuffled = shuffleArray([...allMembers]);
   const upBill = shuffled.slice(0, 3);
   const remaining = shuffled.slice(3);
   
-  // Chia nhóm chúc bill, tối đa 3 nhóm
+  // Chia nhóm chúc bill, mỗi nhóm tối đa 4 người
   const chucBillGroups = [];
-  const groupSize = Math.ceil(remaining.length / 3);
-  
-  for (let i = 0; i < remaining.length && chucBillGroups.length < 3; i += groupSize) {
-    chucBillGroups.push(remaining.slice(i, i + groupSize));
+  for (let i = 0; i < remaining.length; i += 4) {
+    chucBillGroups.push(remaining.slice(i, Math.min(i + 4, remaining.length)));
   }
 
   return { upBill, chucBillGroups };
-}
-
-function findOwner(number, attendance) {
-  for (const [member, numbers] of attendance.memberData.entries()) {
-    if (numbers.includes(number)) return member;
-  }
-  return 'Unknown';
 }
 
 function shuffleArray(array) {
