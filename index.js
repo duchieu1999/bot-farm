@@ -7,6 +7,7 @@ const path = require('path');
 const bodyParser = require('body-parser');
 const moment = require('moment-timezone');
 const request = require('request');
+const schedule = require('node-schedule');
 const cron = require('node-cron'); // Thư viện để thiết lập cron jobs
 const keep_alive = require('./keep_alive.js');
 const { resetDailyGiftStatus, sendMorningMessage, handleGiftClaim } = require('./gift');
@@ -1739,6 +1740,7 @@ const kickbot = {
   "-1002129896837": "GROUP I MẠNH ĐỨC CHIA SẺ", 
   "-1002228252389": "ORMARKET community",
   "-1002103270166": "Tổng bank",
+  "-1002280909865": "nhom5k",
   "-1002128289933": "test",
   "-1002479414582": "ei292", 
   "-1002499533124": "ekfrek",
@@ -1997,6 +1999,130 @@ bot.onText(/Trừ/, async (msg) => {
 
 
 
+
+// Schema MongoDB
+const attendanceSchema = new mongoose.Schema({
+  ca: String, // Ví dụ: 'ca_9h30'
+  memberData: {
+    type: Map,
+    of: [Number] // Dữ liệu dạng { 'Tên thành viên': [1, 2, 3] }
+  },
+  createdAt: { type: Date, default: Date.now }
+});
+
+const Attendance = mongoose.model('Attendance', attendanceSchema);
+
+// Các khung giờ điểm danh
+const timeSlots = [
+  { time: '9:30', label: 'ca 9h30' },
+  { time: '11:30', label: 'ca 11h30' },
+  { time: '14:30', label: 'ca 14h30' },
+  { time: '18:00', label: 'ca 18h00' },
+  { time: '19:30', label: 'ca 19h30' }
+];
+
+const groupId = -1002280909865; // Thay bằng ID nhóm Telegram của bạn
+
+// Tạo lịch reset dữ liệu mỗi ngày
+schedule.scheduleJob('0 0 * * *', async () => {
+  await Attendance.deleteMany({});
+  console.log('Dữ liệu điểm danh đã được reset!');
+});
+
+// Tạo lịch cho từng khung giờ
+timeSlots.forEach((slot, index) => {
+  const [hour, minute] = slot.time.split(':').map(Number);
+
+  schedule.scheduleJob({ hour, minute, tz: 'Asia/Ho_Chi_Minh' }, async () => {
+    const label = slot.label;
+    const currentCa = `ca_${index + 1}`;
+
+    // Khởi tạo phiên điểm danh mới
+    const attendance = new Attendance({ ca: currentCa, memberData: new Map() });
+    await attendance.save();
+
+    bot.sendMessage(groupId, `🔔 Điểm danh ${label}! Mọi người báo số thứ tự của mình nào!`);
+
+    // Lắng nghe tin nhắn từ các thành viên
+    const listener = bot.on('message', async (msg) => {
+      if (msg.chat.id !== groupId) return;
+
+      const text = msg.text;
+      const memberName = msg.from.first_name || msg.from.username;
+
+      if (/^\d+(\s+\d+)*$/.test(text)) {
+        const numbers = text.split(/\s+/).map(Number);
+        const currentAttendance = await Attendance.findOne({ ca: currentCa });
+
+        if (currentAttendance) {
+          // Cập nhật dữ liệu điểm danh
+          currentAttendance.memberData.set(
+            memberName,
+            (currentAttendance.memberData.get(memberName) || []).concat(numbers)
+          );
+
+          await currentAttendance.save();
+          const allNumbers = Array.from(currentAttendance.memberData.values()).flat().sort((a, b) => a - b);
+
+          // Nếu đạt đến số 15, chốt điểm danh
+          if (allNumbers.length >= 15) {
+            bot.sendMessage(groupId, `✅ Chốt điểm danh ${label}!`);
+
+            // Phân chia số thứ tự
+            const { upBill, chucBillGroups } = allocateNumbers(allNumbers, currentAttendance);
+
+            // Tạo tin nhắn thông báo phân chia
+            let response = '';
+            response += `🎉 Phân chia số thứ tự:\n`;
+            response += `${upBill.map(num => `${num} (${findOwner(num, currentAttendance)})`).join(', ')} lên bill\n`;
+
+            chucBillGroups.forEach((group, idx) => {
+              response += `${group.map(num => `${num} (${findOwner(num, currentAttendance)})`).join(', ')} chúc bill ${idx + 1}\n`;
+            });
+
+            bot.sendMessage(groupId, response.trim());
+            bot.removeListener('message', listener); // Ngắt lắng nghe khi đã chốt
+          }
+        }
+      }
+    });
+  });
+});
+
+// Hàm phân chia số thứ tự
+function allocateNumbers(allNumbers, attendance) {
+  const usedNumbers = new Set(); // Các số đã được phân chia
+  const eligibleNumbers = allNumbers.filter((num) => !usedNumbers.has(num));
+
+  const shuffled = shuffleArray(eligibleNumbers); // Xáo trộn ngẫu nhiên
+  const upBill = shuffled.slice(0, 3); // 3 số lên bill
+  const chucBillGroups = [];
+
+  for (let i = 3; i < shuffled.length; i += 4) {
+    chucBillGroups.push(shuffled.slice(i, i + 4));
+  }
+
+  upBill.forEach((num) => usedNumbers.add(num)); // Đánh dấu các số đã sử dụng
+
+  return { upBill, chucBillGroups };
+}
+
+// Hàm tìm thành viên sở hữu số thứ tự
+function findOwner(number, attendance) {
+  for (const [member, numbers] of attendance.memberData.entries()) {
+    if (numbers.includes(number)) return member;
+  }
+  return 'Unknown';
+}
+
+// Hàm xáo trộn mảng
+function shuffleArray(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
 
 
 
