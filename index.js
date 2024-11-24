@@ -2020,11 +2020,11 @@ const timeSlots = [
   { time: '9:30', label: 'ca 9h30' },
   { time: '11:30', label: 'ca 11h30' },
   { time: '14:30', label: 'ca 14h30' }, 
-  { time: '17:44', label: 'ca 18h00' },
+  { time: '17:50', label: 'ca 18h00' },
   { time: '19:30', label: 'ca 19h30' }
 ];
 
-const groupId = -1002392685048; 
+const groupId = -1002333438294; 
 const adminIds = [7305842707]; // Thêm ID của admin vào đây
 
 let billImagesCount = 0;
