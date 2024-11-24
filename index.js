@@ -2000,14 +2000,15 @@ bot.onText(/Trừ/, async (msg) => {
 
 
 
+
 // Schema MongoDB
 const attendanceSchema = new mongoose.Schema({
   ca: String, // Ví dụ: 'ca_9h30'
   memberData: {
     type: Map,
-    of: [Number] // Dữ liệu dạng { 'Tên thành viên': [1, 2, 3] }
+    of: [Number], // Dữ liệu dạng { 'Tên thành viên': [1, 2, 3] }
   },
-  createdAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
 });
 
 const Attendance = mongoose.model('Attendance', attendanceSchema);
@@ -2017,11 +2018,12 @@ const timeSlots = [
   { time: '9:30', label: 'ca 9h30' },
   { time: '11:30', label: 'ca 11h30' },
   { time: '14:30', label: 'ca 14h30' },
-  { time: '16:15', label: 'ca 18h00' },
-  { time: '19:30', label: 'ca 19h30' }
+  { time: '16:50', label: 'ca 18h00' },
+  { time: '19:30', label: 'ca 19h30' },
 ];
 
 const groupId = -1002280909865; // Thay bằng ID nhóm Telegram của bạn
+const billUserId = 7305842707; // ID của người gửi hình ảnh bill
 
 // Tạo lịch reset dữ liệu mỗi ngày
 schedule.scheduleJob('0 0 * * *', async () => {
@@ -2058,7 +2060,7 @@ timeSlots.forEach((slot, index) => {
           // Cập nhật dữ liệu điểm danh
           currentAttendance.memberData.set(
             memberName,
-            (currentAttendance.memberData.get(memberName) || []).concat(numbers)
+            (currentAttendance.memberData.get(memberName) || []).concat(numbers),
           );
 
           await currentAttendance.save();
@@ -2072,15 +2074,32 @@ timeSlots.forEach((slot, index) => {
             const { upBill, chucBillGroups } = allocateNumbers(allNumbers, currentAttendance);
 
             // Tạo tin nhắn thông báo phân chia
-            let response = '';
-            response += `🎉 Phân chia số thứ tự:\n`;
-            response += `${upBill.map(num => `${num} (${findOwner(num, currentAttendance)})`).join(', ')} lên bill\n`;
-
-            chucBillGroups.forEach((group, idx) => {
-              response += `${group.map(num => `${num} (${findOwner(num, currentAttendance)})`).join(', ')} chúc bill ${idx + 1}\n`;
+            let response = `🎉 **Chia cổ phần nha:**\n\n`;
+            response += `👉 **Lên bill:**\n`;
+            upBill.forEach((num) => {
+              const owner = findOwner(num, currentAttendance);
+              response += `• ${num} ([${owner}](tg://user?id=${msg.from.id}))\n`;
             });
 
-            bot.sendMessage(groupId, response.trim());
+            response += `\n👉 **Chúc bill:**\n`;
+            chucBillGroups.forEach((group, idx) => {
+              response += `• Chúc bill ${idx + 1}: ${group.join(', ')}\n`;
+            });
+
+            bot.sendMessage(groupId, response.trim(), { parse_mode: 'Markdown' });
+
+            // Lấy và chuyển tiếp tin nhắn ảnh từ billUserId
+            const photos = await getBillPhotos(billUserId, label, upBill);
+            if (photos) {
+              photos.forEach((photo, i) => {
+                const owner = findOwner(upBill[i], currentAttendance);
+                bot.forwardMessage(groupId, billUserId, photo.message_id, {
+                  caption: `bill ${label} của [${owner}](tg://user?id=${msg.from.id}) nhớ lên nhé!`,
+                  parse_mode: 'Markdown',
+                });
+              });
+            }
+
             bot.removeListener('message', listener); // Ngắt lắng nghe khi đã chốt
           }
         }
@@ -2098,8 +2117,9 @@ function allocateNumbers(allNumbers, attendance) {
   const upBill = shuffled.slice(0, 3); // 3 số lên bill
   const chucBillGroups = [];
 
-  for (let i = 3; i < shuffled.length; i += 4) {
+  for (let i = 3; i < Math.min(shuffled.length, 15); i += 4) {
     chucBillGroups.push(shuffled.slice(i, i + 4));
+    if (chucBillGroups.length === 3) break; // Giới hạn 3 nhóm chúc bill
   }
 
   upBill.forEach((num) => usedNumbers.add(num)); // Đánh dấu các số đã sử dụng
@@ -2115,6 +2135,18 @@ function findOwner(number, attendance) {
   return 'Unknown';
 }
 
+// Hàm lấy ảnh bill
+async function getBillPhotos(userId, label, upBill) {
+  const photos = []; // Dùng API Telegram để lọc các tin nhắn ảnh trong khoảng thời gian ca
+  const messages = await bot.getChatHistory(userId, { limit: 100 }); // Tải tối đa 100 tin nhắn gần nhất
+  for (const msg of messages) {
+    if (msg.photo && msg.caption?.includes(label)) {
+      photos.push(msg);
+    }
+  }
+  return photos.slice(0, upBill.length); // Trả về số lượng ảnh tương ứng với số người lên bill
+}
+
 // Hàm xáo trộn mảng
 function shuffleArray(array) {
   for (let i = array.length - 1; i > 0; i--) {
@@ -2123,6 +2155,7 @@ function shuffleArray(array) {
   }
   return array;
 }
+
 
 
 
