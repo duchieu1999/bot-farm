@@ -2004,37 +2004,33 @@ bot.onText(/Trừ/, async (msg) => {
 
 
 
-// Schema MongoDB
+
 const attendanceSchema = new mongoose.Schema({
-  ca: String, // Ví dụ: 'ca_9h30'
+  ca: String,
   memberData: {
     type: Map,
-    of: [Number], // Dữ liệu dạng { 'Tên thành viên': [1, 2, 3] }
+    of: [Number]
   },
-  createdAt: { type: Date, default: Date.now },
+  createdAt: { type: Date, default: Date.now }
 });
 
 const Attendance = mongoose.model('Attendance', attendanceSchema);
 
-// Các khung giờ điểm danh
 const timeSlots = [
   { time: '9:30', label: 'ca 9h30' },
   { time: '11:30', label: 'ca 11h30' },
-  { time: '14:30', label: 'ca 14h30' },
-  { time: '17:06', label: 'ca 18h00' },
-  { time: '19:30', label: 'ca 19h30' },
+  { time: '14:30', label: 'ca 14h30' }, 
+  { time: '18:00', label: 'ca 18h00' },
+  { time: '19:30', label: 'ca 19h30' }
 ];
 
-const groupId = -1002280909865; // Thay bằng ID nhóm Telegram của bạn
-const billUserId = 7305842707; // ID của người gửi hình ảnh bill
+const groupId = -1002392685048;
 
-// Tạo lịch reset dữ liệu mỗi ngày
 schedule.scheduleJob('0 0 * * *', async () => {
   await Attendance.deleteMany({});
   console.log('Dữ liệu điểm danh đã được reset!');
 });
 
-// Tạo lịch cho từng khung giờ
 timeSlots.forEach((slot, index) => {
   const [hour, minute] = slot.time.split(':').map(Number);
 
@@ -2042,68 +2038,81 @@ timeSlots.forEach((slot, index) => {
     const label = slot.label;
     const currentCa = `ca_${index + 1}`;
 
-    // Khởi tạo phiên điểm danh mới
     const attendance = new Attendance({ ca: currentCa, memberData: new Map() });
     await attendance.save();
 
     bot.sendMessage(groupId, `🔔 Điểm danh ${label}! Mọi người báo số thứ tự của mình nào!`);
 
-    // Lắng nghe tin nhắn từ các thành viên
+    let billImagesCount = 0;
+    let billImages = [];
+    const upBillMembers = [];
+
     const listener = bot.on('message', async (msg) => {
       if (msg.chat.id !== groupId) return;
 
       const text = msg.text;
       const memberName = msg.from.first_name || msg.from.username;
+      const userId = msg.from.id;
 
       if (/^\d+(\s+\d+)*$/.test(text)) {
         const numbers = text.split(/\s+/).map(Number);
         const currentAttendance = await Attendance.findOne({ ca: currentCa });
 
         if (currentAttendance) {
-          // Cập nhật dữ liệu điểm danh
           currentAttendance.memberData.set(
-            memberName,
-            (currentAttendance.memberData.get(memberName) || []).concat(numbers),
+            memberName, 
+            (currentAttendance.memberData.get(memberName) || []).concat(numbers)
           );
 
           await currentAttendance.save();
           const allNumbers = Array.from(currentAttendance.memberData.values()).flat().sort((a, b) => a - b);
 
-          // Nếu đạt đến số 15, chốt điểm danh
           if (allNumbers.length >= 15) {
             bot.sendMessage(groupId, `✅ Chốt điểm danh ${label}!`);
 
-            // Phân chia số thứ tự
             const { upBill, chucBillGroups } = allocateNumbers(allNumbers, currentAttendance);
-
-            // Tạo tin nhắn thông báo phân chia
-            let response = `🎉 **Chia cổ phần nha:**\n\n`;
-            response += `👉 **Lên bill:**\n`;
-            upBill.forEach((num) => {
+            
+            let response = '🎉 *CHIA CỔ PHẦN*\n\n';
+            response += '*🔸 Lên Bill:*\n';
+            upBill.forEach(num => {
               const owner = findOwner(num, currentAttendance);
-              response += `• ${num} ([${owner}](tg://user?id=${msg.from.id}))\n`;
+              upBillMembers.push({name: owner, userId: userId, number: num});
+              response += `   • STT ${num} - [${owner}](tg://user?id=${userId})\n`;
             });
 
-            response += `\n👉 **Chúc bill:**\n`;
+            response += '\n*🔸 Chúc Bill:*\n';
             chucBillGroups.forEach((group, idx) => {
-              response += `• Chúc bill ${idx + 1}: ${group.join(', ')}\n`;
+              response += `   • Bill ${idx + 1}: ${group.join(', ')}\n`;
             });
 
-            bot.sendMessage(groupId, response.trim(), { parse_mode: 'Markdown' });
+            bot.sendMessage(groupId, response, {parse_mode: 'Markdown'});
 
-            // Lấy và chuyển tiếp tin nhắn ảnh từ billUserId
-            const photos = await getBillPhotos(billUserId, label, upBill);
-            if (photos) {
-              photos.forEach((photo, i) => {
-                const owner = findOwner(upBill[i], currentAttendance);
-                bot.forwardMessage(groupId, billUserId, photo.message_id, {
-                  caption: `bill ${label} của [${owner}](tg://user?id=${msg.from.id}) nhớ lên nhé!`,
-                  parse_mode: 'Markdown',
-                });
-              });
-            }
+            // Lắng nghe ảnh bill từ admin
+            const billListener = bot.on('message', async (msg) => {
+              if (msg.chat.id !== groupId || !msg.photo) return;
+              
+              if (msg.from.id === adminId && billImagesCount < 3) {
+                // Lưu message_id của ảnh bill
+                billImages.push(msg.message_id);
+                billImagesCount++;
+                
+                if (billImagesCount === 3) {
+                  // Khi đã có đủ 3 ảnh, chuyển tiếp cho từng thành viên
+                  for(let i = 0; i < 3; i++) {
+                    const member = upBillMembers[i];
+                    await bot.forwardMessage(groupId, groupId, billImages[i]); // Chuyển tiếp ảnh
+                    await bot.sendMessage(groupId, 
+                      `Bill ${label} của [${member.name}](tg://user?id=${member.userId}) nhớ lên nhé`, 
+                      {parse_mode: 'Markdown'}
+                    );
+                  }
+                  
+                  bot.removeListener('message', billListener);
+                }
+              }
+            });
 
-            bot.removeListener('message', listener); // Ngắt lắng nghe khi đã chốt
+            bot.removeListener('message', listener);
           }
         }
       }
@@ -2111,26 +2120,23 @@ timeSlots.forEach((slot, index) => {
   });
 });
 
-// Hàm phân chia số thứ tự
 function allocateNumbers(allNumbers, attendance) {
-  const usedNumbers = new Set(); // Các số đã được phân chia
+  const usedNumbers = new Set();
   const eligibleNumbers = allNumbers.filter((num) => !usedNumbers.has(num));
 
-  const shuffled = shuffleArray(eligibleNumbers); // Xáo trộn ngẫu nhiên
-  const upBill = shuffled.slice(0, 3); // 3 số lên bill
+  const shuffled = shuffleArray(eligibleNumbers);
+  const upBill = shuffled.slice(0, 3);
   const chucBillGroups = [];
 
-  for (let i = 3; i < Math.min(shuffled.length, 15); i += 4) {
+  for (let i = 3; i < shuffled.length; i += 4) {
     chucBillGroups.push(shuffled.slice(i, i + 4));
-    if (chucBillGroups.length === 3) break; // Giới hạn 3 nhóm chúc bill
   }
 
-  upBill.forEach((num) => usedNumbers.add(num)); // Đánh dấu các số đã sử dụng
+  upBill.forEach((num) => usedNumbers.add(num));
 
   return { upBill, chucBillGroups };
 }
 
-// Hàm tìm thành viên sở hữu số thứ tự
 function findOwner(number, attendance) {
   for (const [member, numbers] of attendance.memberData.entries()) {
     if (numbers.includes(number)) return member;
@@ -2138,41 +2144,6 @@ function findOwner(number, attendance) {
   return 'Unknown';
 }
 
-async function getBillPhotos(userId, label, upBill, bot) {
-  // Lấy lịch sử tin nhắn từ `userid` (ảnh gần nhất)
-  const messages = await bot.getChatHistory(userId, { limit: 100 }); // Tải tối đa 100 tin nhắn gần nhất
-  const photos = messages
-    .filter(msg => msg.photo && msg.caption?.includes(label))
-    .slice(0, upBill.length); // Giới hạn số lượng ảnh theo số người lên bill
-
-  if (photos.length >= upBill.length) {
-    // Nếu đủ ảnh, trả về ngay
-    return photos;
-  }
-
-  // Nếu không đủ ảnh, chờ ảnh mới được gửi
-  return new Promise((resolve) => {
-    bot.on('message', function listener(msg) {
-      if (msg.chat.id === userId && msg.photo) {
-        // Nếu tin nhắn là ảnh và từ đúng `userid`, thêm ảnh vào danh sách
-        photos.push(msg);
-        if (photos.length >= upBill.length) {
-          bot.removeListener('message', listener); // Gỡ listener khi đủ ảnh
-          resolve(photos);
-        }
-      }
-    });
-
-    // Timeout sau 10 phút nếu không nhận được ảnh
-    setTimeout(() => {
-      bot.removeListener('message', listener);
-      resolve(photos); // Trả về ảnh đã nhận được (dù chưa đủ)
-    }, 10 * 60 * 1000); // 10 phút
-  });
-}
-
-
-// Hàm xáo trộn mảng
 function shuffleArray(array) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
