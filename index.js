@@ -2028,7 +2028,7 @@ const timeSlots = [
   { time: '11:30', label: 'ca 11h30' },
   { time: '14:30', label: 'ca 14h30' }, 
   { time: '18:00', label: 'ca 18h00' },
-  { time: '19:33', label: 'ca 19h30' }
+  { time: '19:48', label: 'ca 19h30' }
 ];
 
 const groupId = -1002333438294;
@@ -2162,8 +2162,8 @@ timeSlots.forEach((slot, index) => {
         response += '\n*🔸 Chúc Bill:*\n';
         chucBillGroups.forEach((group, idx) => {
           if (group.length <= 4) {
-            response += `   • Bill ${idx + 1}: ${group.map(m => `${m.number}([${m.name}](tg://user?id=${m.userId}))`).join(', ')}\n`;
-          }
+  response += `   • Bill ${idx + 1}: ${group.map(m => `${m.number}`).join(', ')}\n`;
+       }
         });
 
         bot.sendMessage(groupId, response, {
@@ -2172,7 +2172,7 @@ timeSlots.forEach((slot, index) => {
         });
         
         isWaitingForBills = true;
-        bot.sendMessage(groupId, '📸 Chờ QTV gửi 3 ảnh bill');
+        bot.sendMessage(groupId, '📸 Chờ QTV gửi 3 ảnh bill lên nhóm để chia');
       }
     };
 
