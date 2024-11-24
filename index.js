@@ -2005,13 +2005,6 @@ bot.onText(/Trừ/, async (msg) => {
 
 
 
-const schedule = require('node-schedule');
-const mongoose = require('mongoose');
-const moment = require('moment-timezone');
-
-mongoose.connect('mongodb://localhost:27017/diemdanh', { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log('Kết nối MongoDB thành công!'))
-  .catch((err) => console.error('Lỗi kết nối MongoDB:', err));
 
 const attendanceSchema = new mongoose.Schema({
   ca: String,
@@ -2031,7 +2024,7 @@ const timeSlots = [
   { time: '9:30', label: 'ca 9h30' },
   { time: '11:30', label: 'ca 11h30' },
   { time: '14:30', label: 'ca 14h30' }, 
-  { time: '18:01', label: 'ca 18h00' },
+  { time: '18:03', label: 'ca 18h00' },
   { time: '19:30', label: 'ca 19h30' }
 ];
 
