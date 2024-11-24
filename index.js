@@ -2028,10 +2028,10 @@ const timeSlots = [
   { time: '11:30', label: 'ca 11h30' },
   { time: '14:30', label: 'ca 14h30' }, 
   { time: '18:00', label: 'ca 18h00' },
-  { time: '19:48', label: 'ca 19h30' }
+  { time: '19:30', label: 'ca 19h30' }
 ];
 
-const groupId = -1002333438294;
+const groupId = -1002280909865;
 const adminIds = [7305842707];
 
 let billImagesCount = 0;
@@ -2151,7 +2151,7 @@ timeSlots.forEach((slot, index) => {
 
         const { upBill, chucBillGroups } = allocateNumbers(currentAttendance);
         
-        let response = '🎉 *PHÂN CHIA SỐ THỨ TỰ*\n\n';
+        let response = '🎉 *PHÂN CHIA BILL*\n\n';
         response += '*🔸 Lên Bill:*\n';
         
         upBill.forEach(member => {
