@@ -2134,7 +2134,7 @@ const attendanceSchema = new mongoose.Schema({
     type: Map,
     of: [{
       number: Number,
-      userId: String
+      userId: String  
     }]
   },
   createdAt: { type: Date, default: Date.now }
@@ -2144,13 +2144,13 @@ const Attendance = mongoose.model('Attendance', attendanceSchema);
 
 const timeSlots = [
   { time: '9:30', label: 'ca 9h30' },
-  { time: '11:04', label: 'ca 11h30' },
-  { time: '14:30', label: 'ca 14h30' }, 
-  { time: '18:00', label: 'ca 18h00' },
+  { time: '11:30', label: 'ca 11h30' },
+  { time: '14:30', label: 'ca 14h30' },
+  { time: '18:00', label: 'ca 18h00' }, 
   { time: '19:30', label: 'ca 19h30' }
 ];
 
-const groupId = -1002333438294;
+const groupId = -1002280909865;
 const adminIds = [7305842707];
 
 let billImagesCount = 0;
@@ -2217,11 +2217,16 @@ timeSlots.forEach((slot, index) => {
       }
 
       const text = msg.text;
-      if (!text || !/^\d+(\s+\d+)*$/.test(text)) return;
-
+      if (!text) return;
+      
+      // Xử lý tin nhắn chứa số và các ký tự đặc biệt
+      const cleanedText = text.replace(/[,.@\-_#$%^&*()]/g, ' ').trim();
+      // Kiểm tra xem tin nhắn có chứa chỉ số và khoảng trắng không
+      if (!/^[\d\s]+$/.test(cleanedText)) return;
+      
       const memberName = msg.from.first_name || msg.from.username;
       const userId = msg.from.id;
-      const numbers = text.split(/\s+/).map(Number);
+      const numbers = cleanedText.split(/\s+/).map(Number);
       
       const currentAttendance = await Attendance.findOne({ ca: currentCa });
       if (!currentAttendance) return;
@@ -2252,7 +2257,7 @@ timeSlots.forEach((slot, index) => {
       }
 
       // Thêm số thứ tự mới
-      currentAttendance.memberData.set(memberName, 
+      currentAttendance.memberData.set(memberName,
         numbers.map(num => ({
           number: num,
           userId: userId
@@ -2281,8 +2286,8 @@ timeSlots.forEach((slot, index) => {
         response += '\n*🔸 Chúc Bill:*\n';
         chucBillGroups.forEach((group, idx) => {
           if (group.length <= 4) {
-  response += `   • Bill ${idx + 1}: ${group.map(m => `${m.number}`).join(', ')}\n`;
-       }
+            response += `   • Bill ${idx + 1}: ${group.map(m => `${m.number}`).join(', ')}\n`;
+          }
         });
 
         bot.sendMessage(groupId, response, {
