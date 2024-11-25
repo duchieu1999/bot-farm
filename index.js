@@ -754,7 +754,6 @@ async function processAccMessage7(msg) {
 bot.onText(/\/333/, async (msg) => {
   const chatId = msg.chat.id;
 
-  // Tạo danh sách ngày từ hôm nay đến 2 ngày trước
   const dates = [];
   for (let i = 0; i < 3; i++) {
     const date = new Date();
@@ -764,64 +763,60 @@ bot.onText(/\/333/, async (msg) => {
 
   const groupName = 'BẢNG CÔNG BOSS HICC';
   const url = 'https://quickchart.io/graphviz?format=png&layout=dot&graph=';
-  let grandTotal = 0; // Tổng tiền của 3 ngày
-  const dailyImages = []; // Mảng lưu URL ảnh của từng ngày và tổng tiền
+  let grandTotal = 0;
+  const dailyImages = [];
 
   for (const dateStr of dates) {
     const bangCongList = await Trasua.find({ groupId: -1002143712364, date: dateStr });
 
     if (bangCongList.length === 0) {
-      // Nếu không có bảng công, thêm thông báo cho ngày đó
       bot.sendMessage(chatId, `Chưa có bảng công nào được ghi nhận trong ngày ${dateStr}.`);
       continue;
     }
 
-    let totalAmount = 50000; // Tiền quản lý
+    let totalAmount = 50000;
+    
+    // Tạo nội dung với các ca và bài đăng
     let content = bangCongList.map(entry => {
-      // Lấy thông tin số acc cho từng ca và số bài đăng
-      const caData = entry.caData || {};
-      const accCa1 = caData.Ca1 || 0;
-      const accCa2 = caData.Ca2 || 0;
-      const accCa3 = caData.Ca3 || 0;
-      const accCa4 = caData.Ca4 || 0;
-      const accCa5 = caData.Ca5 || 0;
-      const post = entry.post || 0;
-
-      return `${entry.ten}\t${accCa1}\t${accCa2}\t${accCa3}\t${accCa4}\t${accCa5}\t${post}\t${entry.tinh_tien.toLocaleString()} vnđ`;
+      const ca1 = (entry.caData?.Ca1 || 0) > 0 ? entry.caData.Ca1 : '-';
+      const ca2 = (entry.caData?.Ca2 || 0) > 0 ? entry.caData.Ca2 : '-';
+      const ca3 = (entry.caData?.Ca3 || 0) > 0 ? entry.caData.Ca3 : '-';
+      const ca4 = (entry.caData?.Ca4 || 0) > 0 ? entry.caData.Ca4 : '-';
+      const ca5 = (entry.caData?.Ca5 || 0) > 0 ? entry.caData.Ca5 : '-';
+      const posts = (entry.post || 0) > 0 ? entry.post : '-';
+      return `${entry.ten}\t${ca1}\t${ca2}\t${ca3}\t${ca4}\t${ca5}\t${posts}\t${entry.acc}\t${entry.tinh_tien.toLocaleString()} vnđ`;
     }).join('\n');
 
-    // Tính tổng tiền công
     bangCongList.forEach(entry => {
       totalAmount += entry.tinh_tien;
     });
 
-    // Cộng vào tổng tiền 3 ngày
     grandTotal += totalAmount;
 
-    // Chuẩn bị URL của QuickChart với cấu trúc bảng
     const graph = `
       digraph G {
         node [shape=plaintext];
         a [label=<
-          <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" STYLE="font-family: 'Arial', sans-serif; border: 1px solid black;">
-            <TR><TD COLSPAN="8" ALIGN="CENTER" BGCOLOR="#FFCC00" STYLE="font-size: 16px; font-weight: bold;">${groupName} - ${dateStr}</TD></TR>
-            <TR STYLE="font-weight: bold; background-color: #FFCC00;">
-              <TD ALIGN="CENTER">Tên</TD>
-              <TD ALIGN="CENTER">Ca 1</TD>
-              <TD ALIGN="CENTER">Ca 2</TD>
-              <TD ALIGN="CENTER">Ca 3</TD>
-              <TD ALIGN="CENTER">Ca 4</TD>
-              <TD ALIGN="CENTER">Ca 5</TD>
-              <TD ALIGN="CENTER">Đăng Bài</TD>
+          <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" STYLE="font-family: 'Arial', sans-serif; border: 2px solid black;">
+            <TR><TD COLSPAN="9" ALIGN="CENTER" BGCOLOR="#2196F3" STYLE="font-size: 18px; font-weight: bold; color: white;">${groupName} - ${dateStr}</TD></TR>
+            <TR STYLE="font-weight: bold; background-color: #E3F2FD;">
+              <TD ALIGN="CENTER" STYLE="min-width: 120px;">Tên</TD>
+              <TD ALIGN="CENTER">Ca 1<BR/><FONT POINT-SIZE="10">(10h)</FONT></TD>
+              <TD ALIGN="CENTER">Ca 2<BR/><FONT POINT-SIZE="10">(12h)</FONT></TD>
+              <TD ALIGN="CENTER">Ca 3<BR/><FONT POINT-SIZE="10">(15h)</FONT></TD>
+              <TD ALIGN="CENTER">Ca 4<BR/><FONT POINT-SIZE="10">(18h30)</FONT></TD>
+              <TD ALIGN="CENTER">Ca 5<BR/><FONT POINT-SIZE="10">(20h)</FONT></TD>
+              <TD ALIGN="CENTER">Bài<BR/>đăng</TD>
+              <TD ALIGN="CENTER">Tổng<BR/>Acc</TD>
               <TD ALIGN="CENTER">Tiền công</TD>
             </TR>
             ${content.split('\n').map(line => `<TR><TD ALIGN="LEFT" STYLE="font-weight: bold;">${line.split('\t').join('</TD><TD ALIGN="CENTER">')}</TD></TR>`).join('')}
-            <TR STYLE="font-weight: bold;">
-              <TD COLSPAN="6" ALIGN="LEFT">Quản lý</TD>
+            <TR STYLE="font-weight: bold; background-color: #E3F2FD;">
+              <TD COLSPAN="8" ALIGN="LEFT">Quản lý</TD>
               <TD ALIGN="CENTER">50,000 vnđ</TD>
             </TR>
-            <TR STYLE="font-weight: bold;">
-              <TD COLSPAN="6" ALIGN="LEFT">Tổng số tiền</TD>
+            <TR STYLE="font-weight: bold; background-color: #2196F3; color: white;">
+              <TD COLSPAN="8" ALIGN="LEFT">Tổng số tiền</TD>
               <TD ALIGN="CENTER">${totalAmount.toLocaleString()} vnđ</TD>
             </TR>
           </TABLE>
@@ -830,29 +825,27 @@ bot.onText(/\/333/, async (msg) => {
     `;
     
     const imageUrl = `${url}${encodeURIComponent(graph)}`;
-    dailyImages.push({ dateStr, imageUrl, totalAmount }); // Lưu totalAmount cho ngày này
+    dailyImages.push({ dateStr, imageUrl, totalAmount });
   }
 
-  // Gửi từng bảng công
   for (const { dateStr, imageUrl } of dailyImages) {
     await bot.sendPhoto(chatId, imageUrl, {
       caption: `Bảng Công Nhóm "${groupName}" Ngày ${dateStr}`,
     });
   }
 
-  // Tạo ảnh tổng kết tổng tiền 3 ngày
   const totalGraph = `
     digraph G {
       node [shape=plaintext];
       a [label=<
-        <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" STYLE="font-family: 'Arial', sans-serif; border: 1px solid black;">
-          <TR><TD COLSPAN="2" ALIGN="CENTER" BGCOLOR="#FFCC00" STYLE="font-size: 16px; font-weight: bold;">Tổng Tiền 3 Ngày</TD></TR>
-          <TR STYLE="font-weight: bold; background-color: #FFCC00;">
+        <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" STYLE="font-family: 'Arial', sans-serif; border: 2px solid black;">
+          <TR><TD COLSPAN="2" ALIGN="CENTER" BGCOLOR="#2196F3" STYLE="font-size: 18px; font-weight: bold; color: white;">Tổng Tiền 3 Ngày</TD></TR>
+          <TR STYLE="font-weight: bold; background-color: #E3F2FD;">
             <TD ALIGN="CENTER">Ngày</TD>
             <TD ALIGN="CENTER">Tổng Tiền</TD>
           </TR>
           ${dailyImages.map(({ dateStr, totalAmount }) => `<TR><TD ALIGN="CENTER">${dateStr}</TD><TD ALIGN="CENTER">${totalAmount.toLocaleString()} vnđ</TD></TR>`).join('')}
-          <TR STYLE="font-weight: bold;">
+          <TR STYLE="font-weight: bold; background-color: #2196F3; color: white;">
             <TD ALIGN="LEFT">Tổng Cộng</TD>
             <TD ALIGN="CENTER">${grandTotal.toLocaleString()} vnđ</TD>
           </TR>
@@ -862,13 +855,10 @@ bot.onText(/\/333/, async (msg) => {
   `;
 
   const totalImageUrl = `${url}${encodeURIComponent(totalGraph)}`;
-
-  // Gửi ảnh tổng tiền 3 ngày
   await bot.sendPhoto(chatId, totalImageUrl, {
     caption: `Tổng Kết Tiền Công Trong 3 Ngày`,
   });
 });
-
 
 
 
