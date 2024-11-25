@@ -2153,14 +2153,16 @@ let currentCa = '';
 
 bot.onText(/\/stt/, async (msg) => {
   if (msg.chat.id === groupId) {
-    await Attendance.deleteMany({ ca: currentCa });
+    // Xóa toàn bộ tất cả bản ghi dữ liệu attendanceSchema
+    await Attendance.deleteMany({}); // Xóa tất cả bản ghi trong collection Attendance
     billImagesCount = 0;
     billImages = [];
     upBillMembers = [];
     isWaitingForBills = false;
-    bot.sendMessage(groupId, '🔄 Đã reset dữ liệu số thứ tự của ca hiện tại!');
+    bot.sendMessage(groupId, '🔄 Đã reset toàn bộ dữ liệu số thứ tự của các ca!');
   }
 });
+
 
 timeSlots.forEach((slot, index) => {
   const [hour, minute] = slot.time.split(':').map(Number);
@@ -2229,19 +2231,23 @@ timeSlots.forEach((slot, index) => {
       // Lọc ra các số thứ tự trùng
       const duplicateNumbers = numbers.filter(num => existingNumbers.has(num));
 
-      // Xóa thành viên cũ có số thứ tự trùng
-      if (duplicateNumbers.length > 0) {
-        for (const [name, data] of existingMembers) {
-          const newData = data.filter(item => !duplicateNumbers.includes(item.number));
-          if (newData.length !== data.length) {
-            if (newData.length === 0) {
-              currentAttendance.memberData.delete(name);
-            } else {
-              currentAttendance.memberData.set(name, newData);
-            }
-          }
-        }
-      }
+      // Thay vì xóa số thứ tự đã báo trước, chúng ta cộng dồn số thứ tự mới
+for (const [name, data] of existingMembers) {
+  if (name === memberName) {
+    // Lọc ra các số thứ tự không trùng và thêm vào danh sách cũ
+    const newNumbers = numbers.filter(num => !existingNumbers.has(num));
+    data.push(...newNumbers.map(num => ({
+      number: num,
+      userId: userId
+    })));
+  }
+}
+
+// Cập nhật lại dữ liệu vào Map
+currentAttendance.memberData.set(memberName, 
+  existingMembers.find(([name]) => name === memberName)[1] // Cập nhật thành viên này với số thứ tự mới
+);
+
 
       // Thêm số thứ tự mới
       currentAttendance.memberData.set(memberName, 
