@@ -761,13 +761,13 @@ bot.onText(/\/333/, async (msg) => {
     dates.push(date.toLocaleDateString());
   }
 
-  const groupName = 'BẢNG CÔNG BOSS HICC';
+  const groupName = 'BẢNG CÔNG NHÓM 5K';
   const url = 'https://quickchart.io/graphviz?format=png&layout=dot&graph=';
   let grandTotal = 0;
   const dailyImages = [];
 
   for (const dateStr of dates) {
-    const bangCongList = await Trasua.find({ groupId: -1002143712364, date: dateStr });
+    const bangCongList = await Trasua.find({ groupId: -1002280909865, date: dateStr });
 
     if (bangCongList.length === 0) {
       bot.sendMessage(chatId, `Chưa có bảng công nào được ghi nhận trong ngày ${dateStr}.`);
@@ -800,21 +800,21 @@ bot.onText(/\/333/, async (msg) => {
         node [shape=plaintext];
         a [label=<
           <TABLE BORDER="2" CELLBORDER="1" CELLSPACING="0" CELLPADDING="8" STYLE="font-family: 'Montserrat', sans-serif; border: 3px solid black;">
-            <TR><TD COLSPAN="9" ALIGN="CENTER" BGCOLOR="#1976D2" STYLE="font-size: 24px; font-weight: bold; color: white; padding: 12px;">${groupName}<BR/><FONT POINT-SIZE="18">${dateStr}</FONT></TD></TR>
+            <TR><TD COLSPAN="9" ALIGN="CENTER" BGCOLOR="#1976D2" STYLE="font-size: 35px; font-weight: bold; color: white; padding: 12px;">${groupName}<FONT POINT-SIZE="20">${dateStr}</FONT></TD></TR>
             <TR STYLE="font-weight: bold; background-color: #2196F3; color: white;">
               <TD ALIGN="CENTER" STYLE="min-width: 130px;">Tên</TD>
-              <TD ALIGN="CENTER">Ca 1<BR/><FONT POINT-SIZE="11">(10h)</FONT></TD>
-              <TD ALIGN="CENTER">Ca 2<BR/><FONT POINT-SIZE="11">(12h)</FONT></TD>
-              <TD ALIGN="CENTER">Ca 3<BR/><FONT POINT-SIZE="11">(15h)</FONT></TD>
-              <TD ALIGN="CENTER">Ca 4<BR/><FONT POINT-SIZE="11">(18h30)</FONT></TD>
-              <TD ALIGN="CENTER">Ca 5<BR/><FONT POINT-SIZE="11">(20h)</FONT></TD>
-              <TD ALIGN="CENTER">Bài<BR/>đăng</TD>
-              <TD ALIGN="CENTER">Tổng<BR/>Acc</TD>
-              <TD ALIGN="CENTER" STYLE="min-width: 100px;">Tiền công</TD>
+              <TD ALIGN="CENTER">CA 1<BR/><FONT POINT-SIZE="11">(10h)</FONT></TD>
+              <TD ALIGN="CENTER">CA 2<BR/><FONT POINT-SIZE="11">(12h)</FONT></TD>
+              <TD ALIGN="CENTER">CA 3<BR/><FONT POINT-SIZE="11">(15h)</FONT></TD>
+              <TD ALIGN="CENTER">CA 4<BR/><FONT POINT-SIZE="11">(18h30)</FONT></TD>
+              <TD ALIGN="CENTER">CA 5<BR/><FONT POINT-SIZE="11">(20h)</FONT></TD>
+              <TD ALIGN="CENTER">BÀI ĐĂNG</TD>
+              <TD ALIGN="CENTER">Tổng ACC</TD>
+              <TD ALIGN="CENTER" STYLE="min-width: 100px;">TIỀN CÔNG</TD>
             </TR>
             ${content.split('\n').map(line => `<TR STYLE="font-size: 14px;"><TD ALIGN="LEFT" STYLE="font-weight: bold;">${line.split('\t').join('</TD><TD ALIGN="CENTER">')}</TD></TR>`).join('')}
             <TR STYLE="font-weight: bold; background-color: #2196F3; color: white;">
-              <TD COLSPAN="8" ALIGN="LEFT">Quản lý</TD>
+              <TD COLSPAN="8" ALIGN="LEFT">Quản Lý</TD>
               <TD ALIGN="CENTER">50,000 vnđ</TD>
             </TR>
             <TR STYLE="font-weight: bold; background-color: #1976D2; color: white; font-size: 16px;">
