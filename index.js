@@ -2139,7 +2139,7 @@ const timeSlots = [
   { time: '9:30', label: 'ca 9h30' },
   { time: '11:30', label: 'ca 11h30' },
   { time: '14:30', label: 'ca 14h30' }, 
-  { time: '18:00', label: 'ca 18h00' },
+  { time: '14:57', label: 'ca 18h00' },
   { time: '19:30', label: 'ca 19h30' }
 ];
 
@@ -2210,16 +2210,19 @@ timeSlots.forEach((slot, index) => {
       }
 
       const text = msg.text;
-      if (!text || !/^\d+(\s+\d+)*$/.test(text)) return;
+      if (!text) return;
+
+      // Cập nhật regex để chấp nhận dấu chấm, phẩy và khoảng trắng
+      const sanitizedText = text.replace(/[.,]/g, ' ').trim();
+      if (!/^\d+(\s+\d+)*$/.test(sanitizedText)) return;
 
       const memberName = msg.from.first_name || msg.from.username;
       const userId = msg.from.id;
-      const numbers = text.split(/\s+/).map(Number);
+      const numbers = sanitizedText.split(/\s+/).map(Number);
       
       const currentAttendance = await Attendance.findOne({ ca: currentCa });
       if (!currentAttendance) return;
 
-      // Kiểm tra số thứ tự trùng lặp
       const existingMembers = Array.from(currentAttendance.memberData.entries());
       const existingNumbers = new Set();
       
@@ -2227,10 +2230,8 @@ timeSlots.forEach((slot, index) => {
         data.forEach(item => existingNumbers.add(item.number));
       }
 
-      // Lọc ra các số thứ tự trùng
       const duplicateNumbers = numbers.filter(num => existingNumbers.has(num));
 
-      // Xóa thành viên cũ có số thứ tự trùng
       if (duplicateNumbers.length > 0) {
         for (const [name, data] of existingMembers) {
           const newData = data.filter(item => !duplicateNumbers.includes(item.number));
@@ -2244,7 +2245,6 @@ timeSlots.forEach((slot, index) => {
         }
       }
 
-      // Thêm số thứ tự mới
       currentAttendance.memberData.set(memberName, 
         numbers.map(num => ({
           number: num,
@@ -2274,8 +2274,8 @@ timeSlots.forEach((slot, index) => {
         response += '\n*🔸 Chúc Bill:*\n';
         chucBillGroups.forEach((group, idx) => {
           if (group.length <= 4) {
-  response += `   • Bill ${idx + 1}: ${group.map(m => `${m.number}`).join(', ')}\n`;
-       }
+            response += `   • Bill ${idx + 1}: ${group.map(m => `${m.number}`).join(', ')}\n`;
+          }
         });
 
         bot.sendMessage(groupId, response, {
@@ -2308,7 +2308,6 @@ function allocateNumbers(attendance) {
   const upBill = shuffled.slice(0, 3);
   const remaining = shuffled.slice(3);
   
-  // Chia nhóm chúc bill, mỗi nhóm tối đa 4 người
   const chucBillGroups = [];
   let currentGroup = [];
   
@@ -2324,7 +2323,7 @@ function allocateNumbers(attendance) {
     chucBillGroups.push(currentGroup);
   }
 
-  return { upBill, chucBillGroups: chucBillGroups.slice(0, 3) }; // Giới hạn tối đa 3 bill
+  return { upBill, chucBillGroups: chucBillGroups.slice(0, 3) };
 }
 
 function shuffleArray(array) {
@@ -2334,7 +2333,6 @@ function shuffleArray(array) {
   }
   return array;
 }
-
 
 
 
