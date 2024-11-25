@@ -2145,7 +2145,7 @@ const Attendance = mongoose.model('Attendance', attendanceSchema);
 const timeSlots = [
   { time: '9:30', label: 'ca 9h30' },
   { time: '11:30', label: 'ca 11h30' },
-  { time: '14:30', label: 'ca 14h30' }, 
+  { time: '13:00', label: 'ca 14h30' }, 
   { time: '18:00', label: 'ca 18h00' },
   { time: '19:30', label: 'ca 19h30' }
 ];
