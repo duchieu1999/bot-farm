@@ -2140,7 +2140,7 @@ const timeSlots = [
   { time: '11:30', label: 'ca 11h30' },
   { time: '14:30', label: 'ca 14h30' }, 
   { time: '18:00', label: 'ca 18h00' },
-  { time: '16:17', label: 'ca 19h30' }
+  { time: '16:31', label: 'ca 19h30' }
 ];
 
 const groupId = -1002333438294;
@@ -2180,7 +2180,7 @@ timeSlots.forEach((slot, index) => {
 
     bot.sendMessage(groupId, `🔔 Điểm danh ${label}! Mọi người báo số thứ tự của mình nào!`);
 
-    const messageHandler = async (msg) => {
+   const messageHandler = async (msg) => {
     if (msg.chat.id !== groupId) return;
 
     const text = msg.text;
@@ -2233,11 +2233,15 @@ timeSlots.forEach((slot, index) => {
 
     await currentAttendance.save();
 
+    // Tính tổng tất cả các số thứ tự hiện tại
     const allNumbers = Array.from(currentAttendance.memberData.values())
         .flat()
         .map(item => item.number);
 
-    if (allNumbers.length >= 15) {
+    const totalNumbers = allNumbers.length;
+
+    // Chốt điểm danh khi tổng số >= 15
+    if (totalNumbers >= 15) {
         bot.sendMessage(groupId, `✅ Chốt điểm danh ${label}!`);
 
         const { upBill, chucBillGroups } = allocateNumbers(currentAttendance);
@@ -2264,6 +2268,7 @@ timeSlots.forEach((slot, index) => {
         bot.sendMessage(groupId, '📸 Chờ QTV gửi 3 ảnh bill lên nhóm để chia');
     }
 };
+
 
 
     bot.on('message', messageHandler);
