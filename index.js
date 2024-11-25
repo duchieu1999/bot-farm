@@ -2210,11 +2210,11 @@ timeSlots.forEach((slot, index) => {
       }
 
       const text = msg.text;
-      if (!text || !/^\d+(\s+\d+)*$/.test(text)) return;
+      if (!text || !/^\d+([.,\s]+\d+)*$/.test(text)) return;
 
       const memberName = msg.from.first_name || msg.from.username;
       const userId = msg.from.id;
-      const numbers = text.split(/\s+/).map(Number);
+      const numbers = text.split(/[.,\s]+/).map(Number);
       
       const currentAttendance = await Attendance.findOne({ ca: currentCa });
       if (!currentAttendance) return;
