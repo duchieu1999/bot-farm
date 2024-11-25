@@ -566,12 +566,7 @@ async function processAccSubmission(msg, accMatches, caMatches) {
   });
 
   // Gửi thông báo
-  let responseMessage = `Bài nộp của ${fullName} đã được ghi nhận.`;
-  responseMessage += `\n- Tổng số acc: ${totalAcc} (Tổng tiền: +${formattedMoney})`;
-  responseMessage += `\n- Chi tiết theo ca: ${Object.entries(caData)
-    .map(([ca, count]) => `${ca}: ${count} acc`)
-    .join(', ')}`;
-
+  const responseMessage = `Bài nộp (số ca) của ${fullName} đã được ghi nhận với ${totalAcc} Acc đang chờ kiểm tra ❤🥳.\nTổng tiền: +${formattedMoney}`;
   bot.sendMessage(groupId, responseMessage, { reply_to_message_id: msg.message_id });
 
   // Cập nhật vào cơ sở dữ liệu
@@ -621,9 +616,7 @@ async function processPostSubmission(msg, postMatches) {
   });
 
   // Gửi thông báo
-  let responseMessage = `Bài nộp của ${fullName} đã được ghi nhận.`;
-  responseMessage += `\n- Tổng số bài đăng: ${totalPosts} (Tổng tiền: +${formattedMoney})`;
-
+  const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${totalPosts} bài đăng đang chờ kiểm tra ❤🥳.\nTổng tiền: +${formattedMoney}`;
   bot.sendMessage(groupId, responseMessage, { reply_to_message_id: msg.message_id });
 
   // Cập nhật vào cơ sở dữ liệu
@@ -661,6 +654,7 @@ function mapCaHourToKey(hour) {
       return 'Unknown';
   }
 }
+
 
 
 
@@ -772,7 +766,11 @@ bot.onText(/\/333/, async (msg) => {
     }
 
     let totalAmount = 50000; // Tiền quản lý
-    let content = bangCongList.map(entry => `${entry.ten}\t${entry.acc}\t${entry.tinh_tien.toLocaleString()} vnđ`).join('\n');
+    let content = bangCongList.map(entry => {
+      const caData = ['Ca1', 'Ca2', 'Ca3', 'Ca4', 'Ca5'].map(ca => entry.caData?.[ca] || 0).join('</TD><TD ALIGN="CENTER">');
+      const posts = entry.post || 0;
+      return `${entry.ten}\t${caData}\t${posts}\t${entry.tinh_tien.toLocaleString()} vnđ`;
+    }).join('\n');
 
     // Tính tổng tiền công
     bangCongList.forEach(entry => {
@@ -788,19 +786,24 @@ bot.onText(/\/333/, async (msg) => {
         node [shape=plaintext];
         a [label=<
           <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" STYLE="font-family: 'Arial', sans-serif; border: 1px solid black;">
-            <TR><TD COLSPAN="4" ALIGN="CENTER" BGCOLOR="#FFCC00" STYLE="font-size: 16px; font-weight: bold;">${groupName} - ${dateStr}</TD></TR>
+            <TR><TD COLSPAN="8" ALIGN="CENTER" BGCOLOR="#FFCC00" STYLE="font-size: 16px; font-weight: bold;">${groupName} - ${dateStr}</TD></TR>
             <TR STYLE="font-weight: bold; background-color: #FFCC00;">
               <TD ALIGN="CENTER">Tên</TD>
-              <TD ALIGN="CENTER">Acc</TD>
-              <TD ALIGN="CENTER">Tiền công</TD>
+              <TD ALIGN="CENTER">Ca1</TD>
+              <TD ALIGN="CENTER">Ca2</TD>
+              <TD ALIGN="CENTER">Ca3</TD>
+              <TD ALIGN="CENTER">Ca4</TD>
+              <TD ALIGN="CENTER">Ca5</TD>
+              <TD ALIGN="CENTER">Bài Đăng</TD>
+              <TD ALIGN="CENTER">Tiền Công</TD>
             </TR>
             ${content.split('\n').map(line => `<TR><TD ALIGN="LEFT" STYLE="font-weight: bold;">${line.split('\t').join('</TD><TD ALIGN="CENTER">')}</TD></TR>`).join('')}
             <TR STYLE="font-weight: bold;">
-              <TD COLSPAN="2" ALIGN="LEFT">Quản lý</TD>
+              <TD COLSPAN="7" ALIGN="LEFT">Quản lý</TD>
               <TD ALIGN="CENTER">50,000 vnđ</TD>
             </TR>
             <TR STYLE="font-weight: bold;">
-              <TD COLSPAN="2" ALIGN="LEFT">Tổng số tiền</TD>
+              <TD COLSPAN="7" ALIGN="LEFT">Tổng số tiền</TD>
               <TD ALIGN="CENTER">${totalAmount.toLocaleString()} vnđ</TD>
             </TR>
           </TABLE>
