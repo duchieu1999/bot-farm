@@ -2134,7 +2134,7 @@ const attendanceSchema = new mongoose.Schema({
     type: Map,
     of: [{
       number: Number,
-      userId: String  
+      userId: String
     }]
   },
   createdAt: { type: Date, default: Date.now }
@@ -2144,13 +2144,13 @@ const Attendance = mongoose.model('Attendance', attendanceSchema);
 
 const timeSlots = [
   { time: '9:30', label: 'ca 9h30' },
-  { time: '11:30', label: 'ca 11h30' },
+  { time: '11:46', label: 'ca 11h30' },
   { time: '14:30', label: 'ca 14h30' },
-  { time: '18:00', label: 'ca 18h00' }, 
+  { time: '18:00', label: 'ca 18h00' },
   { time: '19:30', label: 'ca 19h30' }
 ];
 
-const groupId = -1002280909865;
+const groupId = -1002333438294;
 const adminIds = [7305842707];
 
 let billImagesCount = 0;
@@ -2190,6 +2190,7 @@ timeSlots.forEach((slot, index) => {
     const messageHandler = async (msg) => {
       if (msg.chat.id !== groupId) return;
 
+      // Xử lý tin nhắn chứa ảnh bill
       if (isWaitingForBills && msg.photo && adminIds.includes(msg.from.id)) {
         const photoId = msg.photo[msg.photo.length - 1].file_id;
         billImages.push({
@@ -2218,23 +2219,24 @@ timeSlots.forEach((slot, index) => {
 
       const text = msg.text;
       if (!text) return;
-      
-      // Xử lý tin nhắn chứa số và các ký tự đặc biệt
-      const cleanedText = text.replace(/[,.@\-_#$%^&*()]/g, ' ').trim();
-      // Kiểm tra xem tin nhắn có chứa chỉ số và khoảng trắng không
-      if (!/^[\d\s]+$/.test(cleanedText)) return;
-      
+
+      // Kiểm tra nếu nội dung chỉ chứa các số thứ tự hợp lệ với ký tự đặc biệt
+      const cleanedText = text.replace(/[^0-9\s]/g, ''); // Loại bỏ ký tự đặc biệt
+      const isValid = /^[0-9\s]+$/.test(cleanedText) && cleanedText.trim() === text.replace(/[^\d\s]/g, '').trim();
+
+      if (!isValid) return;
+
       const memberName = msg.from.first_name || msg.from.username;
       const userId = msg.from.id;
       const numbers = cleanedText.split(/\s+/).map(Number);
-      
+
       const currentAttendance = await Attendance.findOne({ ca: currentCa });
       if (!currentAttendance) return;
 
       // Kiểm tra số thứ tự trùng lặp
       const existingMembers = Array.from(currentAttendance.memberData.entries());
       const existingNumbers = new Set();
-      
+
       for (const [name, data] of existingMembers) {
         data.forEach(item => existingNumbers.add(item.number));
       }
@@ -2257,7 +2259,7 @@ timeSlots.forEach((slot, index) => {
       }
 
       // Thêm số thứ tự mới
-      currentAttendance.memberData.set(memberName,
+      currentAttendance.memberData.set(memberName, 
         numbers.map(num => ({
           number: num,
           userId: userId
@@ -2319,11 +2321,11 @@ function allocateNumbers(attendance) {
   const shuffled = shuffleArray([...allMembers]);
   const upBill = shuffled.slice(0, 3);
   const remaining = shuffled.slice(3);
-  
+
   // Chia nhóm chúc bill, mỗi nhóm tối đa 4 người
   const chucBillGroups = [];
   let currentGroup = [];
-  
+
   for (const member of remaining) {
     if (currentGroup.length >= 4) {
       chucBillGroups.push(currentGroup);
@@ -2331,7 +2333,7 @@ function allocateNumbers(attendance) {
     }
     currentGroup.push(member);
   }
-  
+
   if (currentGroup.length > 0) {
     chucBillGroups.push(currentGroup);
   }
