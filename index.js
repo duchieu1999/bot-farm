@@ -37,15 +37,23 @@ const BangCongSchema = new mongoose.Schema({
   nhan_anh_bill: { type: Number, default: 0 } // Ensure default is 0
 });
 
- // Define the schema and model for Trasua
+// Define the schema and model for Trasua
 const trasuaSchema = new mongoose.Schema({
-  userId: Number,
-  groupId: Number,
-  date: String,
-  ten: String,
-  acc: Number,
-  tinh_tien: Number,
-});
+  userId: { type: Number, required: true }, // ID người dùng
+  groupId: { type: Number, required: true }, // ID nhóm
+  date: { type: String, required: true }, // Ngày ghi nhận
+  ten: { type: String, required: true }, // Tên người dùng
+  acc: { type: Number, default: 0 }, // Tổng số acc
+  post: { type: Number, default: 0 }, // Tổng số bài đăng
+  tinh_tien: { type: Number, default: 0 }, // Tổng tiền (gồm acc và bài đăng)
+  caData: { // Chi tiết số acc theo từng ca
+    Ca1: { type: Number, default: 0 }, // Acc trong Ca 1 (10h00)
+    Ca2: { type: Number, default: 0 }, // Acc trong Ca 2 (12h00)
+    Ca3: { type: Number, default: 0 }, // Acc trong Ca 3 (15h00)
+    Ca4: { type: Number, default: 0 }, // Acc trong Ca 4 (18h30)
+    Ca5: { type: Number, default: 0 }, // Acc trong Ca 5 (20h00)
+  },
+}, { minimize: false, timestamps: true }); // Timestamps thêm vào để dễ dàng quản lý thời gian
 
 const Trasua = mongoose.model('Trasua', trasuaSchema);
 
@@ -565,8 +573,10 @@ async function processAccSubmission(msg, accMatches, caMatches) {
     currency: 'VND',
   });
 
-  // Gửi thông báo
-  const responseMessage = `Bài nộp (số ca) của ${fullName} đã được ghi nhận với ${totalAcc} Acc đang chờ kiểm tra ❤🥳.\nTổng tiền: +${formattedMoney}`;
+  // Thông báo
+  const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${Object.entries(caData)
+    .map(([ca, count]) => `${ca}: ${count} Acc`)
+    .join(', ')} đang chờ kiểm tra ❤🥳.\nTổng tiền: +${formattedMoney}`;
   bot.sendMessage(groupId, responseMessage, { reply_to_message_id: msg.message_id });
 
   // Cập nhật vào cơ sở dữ liệu
@@ -615,7 +625,7 @@ async function processPostSubmission(msg, postMatches) {
     currency: 'VND',
   });
 
-  // Gửi thông báo
+  // Thông báo
   const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${totalPosts} bài đăng đang chờ kiểm tra ❤🥳.\nTổng tiền: +${formattedMoney}`;
   bot.sendMessage(groupId, responseMessage, { reply_to_message_id: msg.message_id });
 
@@ -654,6 +664,7 @@ function mapCaHourToKey(hour) {
       return 'Unknown';
   }
 }
+
 
 
 
