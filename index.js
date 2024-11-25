@@ -800,9 +800,9 @@ bot.onText(/\/333/, async (msg) => {
         node [shape=plaintext];
         a [label=<
           <TABLE BORDER="2" CELLBORDER="1" CELLSPACING="0" CELLPADDING="8" STYLE="font-family: 'Montserrat', sans-serif; border: 3px solid black;">
-            <TR><TD COLSPAN="9" ALIGN="CENTER" BGCOLOR="#1976D2" STYLE="font-size: 35px; font-weight: bold; color: white; padding: 12px;">${groupName}<FONT POINT-SIZE="20">${dateStr}</FONT></TD></TR>
+           <TR><TD COLSPAN="9" ALIGN="CENTER" BGCOLOR="#1976D2" STYLE="font-size: 26px; font-weight: 1000; color: white; padding: 15px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">${groupName}<FONT POINT-SIZE="20" STYLE="font-weight: 900;">${dateStr}</FONT></TD></TR>
             <TR STYLE="font-weight: bold; background-color: #2196F3; color: white;">
-              <TD ALIGN="CENTER" STYLE="min-width: 130px;">Tên</TD>
+             <TD ALIGN="CENTER" STYLE="min-width: 130px;">Tên</TD>
               <TD ALIGN="CENTER">CA 1<BR/><FONT POINT-SIZE="11">(10h)</FONT></TD>
               <TD ALIGN="CENTER">CA 2<BR/><FONT POINT-SIZE="11">(12h)</FONT></TD>
               <TD ALIGN="CENTER">CA 3<BR/><FONT POINT-SIZE="11">(15h)</FONT></TD>
@@ -818,7 +818,7 @@ bot.onText(/\/333/, async (msg) => {
               <TD ALIGN="CENTER">50,000 vnđ</TD>
             </TR>
             <TR STYLE="font-weight: bold; background-color: #1976D2; color: white; font-size: 16px;">
-              <TD COLSPAN="8" ALIGN="LEFT">Tổng số tiền</TD>
+              <TD COLSPAN="8" ALIGN="LEFT">TỔNG SỐ TIỀN</TD>
               <TD ALIGN="CENTER">${totalAmount.toLocaleString()} vnđ</TD>
             </TR>
           </TABLE>
