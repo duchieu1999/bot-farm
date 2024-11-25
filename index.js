@@ -2145,7 +2145,7 @@ const Attendance = mongoose.model('Attendance', attendanceSchema);
 const timeSlots = [
   { time: '9:30', label: 'ca 9h30' },
   { time: '11:30', label: 'ca 11h30' },
-  { time: '12:30', label: 'ca 14h30' }, 
+  { time: '14:30', label: 'ca 14h30' }, 
   { time: '18:00', label: 'ca 18h00' },
   { time: '19:30', label: 'ca 19h30' }
 ];
@@ -2217,22 +2217,19 @@ timeSlots.forEach((slot, index) => {
       }
 
       const text = msg.text;
-      if (!text) return;
 
-      // Xử lý chuỗi đầu vào
-      const cleanedText = text.replace(/[,.@\s]+/g, ' ').trim();
-      
-      // Kiểm tra xem chuỗi chỉ chứa số và các ký tự phân cách
-      if (!/^\d+(\s+\d+)*$/.test(cleanedText)) return;
+      // Kiểm tra tin nhắn hợp lệ: chỉ chứa số, khoảng trắng và một số dấu đặc biệt
+      if (!text || !/^(\d+([.,@\-]|\s+)?)+$/.test(text)) return;
 
-      // Kiểm tra xem chuỗi gốc có chứa text khác không
-      const originalNumbers = text.replace(/[,.@\s]+/g, ' ').trim();
-      if (originalNumbers !== cleanedText) return;
+      // Kiểm tra không chứa từ ngữ khác
+      if (/[a-zA-ZÀ-ỹ]/.test(text)) return;
 
-      const numbers = cleanedText.split(/\s+/).map(Number);
       const memberName = msg.from.first_name || msg.from.username;
       const userId = msg.from.id;
-      
+
+      // Chuẩn hóa và tách các số từ tin nhắn
+      const numbers = text.match(/\d+/g).map(Number);
+
       const currentAttendance = await Attendance.findOne({ ca: currentCa });
       if (!currentAttendance) return;
 
@@ -2325,6 +2322,7 @@ function allocateNumbers(attendance) {
   const upBill = shuffled.slice(0, 3);
   const remaining = shuffled.slice(3);
   
+  // Chia nhóm chúc bill, mỗi nhóm tối đa 4 người
   const chucBillGroups = [];
   let currentGroup = [];
   
@@ -2340,7 +2338,7 @@ function allocateNumbers(attendance) {
     chucBillGroups.push(currentGroup);
   }
 
-  return { upBill, chucBillGroups: chucBillGroups.slice(0, 3) };
+  return { upBill, chucBillGroups: chucBillGroups.slice(0, 3) }; // Giới hạn tối đa 3 bill
 }
 
 function shuffleArray(array) {
