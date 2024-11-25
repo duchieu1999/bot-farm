@@ -2136,14 +2136,14 @@ const attendanceSchema = new mongoose.Schema({
 const Attendance = mongoose.model('Attendance', attendanceSchema);
 
 const timeSlots = [
-  { time: '9:30', label: 'ca 9h30' },
-  { time: '11:30', label: 'ca 11h30' },
-  { time: '14:30', label: 'ca 14h30' }, 
-  { time: '18:00', label: 'ca 18h00' },
-  { time: '16:55', label: 'ca 19h30' }
+  { time: '9:30', label: 'ca 10h00' },
+  { time: '11:30', label: 'ca 12h00' },
+  { time: '14:30', label: 'ca 15h00' }, 
+  { time: '18:00', label: 'ca 18h30' },
+  { time: '19:30', label: 'ca 20h00' }
 ];
 
-const groupId = -1002333438294;
+const groupId = -1002143712364;
 const adminIds = [7305842707];
 
 let billImagesCount = 0;
@@ -2178,7 +2178,7 @@ timeSlots.forEach((slot, index) => {
     const attendance = new Attendance({ ca: currentCa, memberData: new Map() });
     await attendance.save();
 
-    bot.sendMessage(groupId, `🔔 Điểm danh ${label}! Mọi người báo số thứ tự của mình nào!`);
+    bot.sendMessage(groupId, `🔔 Điểm danh ${label}! Mọi người báo số thứ tự đi`);
 
     const messageHandler = async (msg) => {
       if (msg.chat.id !== groupId) return;
@@ -2196,7 +2196,7 @@ timeSlots.forEach((slot, index) => {
             const member = upBillMembers[i];
             try {
               await bot.sendPhoto(groupId, billImages[i].photoId, {
-                caption: `Bill ${label} của [${member.name}](tg://user?id=${member.userId}) - STT: ${member.number}\nNhớ lên bill nhé!`,
+                caption: `Bill ${label} của [${member.name}](tg://user?id=${member.userId}) - STT: ${member.number}\n`,
                 parse_mode: 'Markdown'
               });
             } catch (error) {
@@ -2284,7 +2284,7 @@ timeSlots.forEach((slot, index) => {
         });
         
         isWaitingForBills = true;
-        bot.sendMessage(groupId, '📸 Chờ QTV gửi 3 ảnh bill lên nhóm để chia');
+        bot.sendMessage(groupId, '📸 Chờ QTV gửi 3 ảnh để chia bill');
       }
     };
 
