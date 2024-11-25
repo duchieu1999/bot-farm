@@ -2138,7 +2138,7 @@ const timeSlots = [
   { time: '9:30', label: 'ca 10h00' },
   { time: '11:30', label: 'ca 12h00' },
   { time: '14:30', label: 'ca 15h00' }, 
-  { time: '18:14', label: 'ca 18h30' },
+  { time: '18:35', label: 'ca 18h30' },
   { time: '17:33', label: 'ca 20h00' }
 ];
 
