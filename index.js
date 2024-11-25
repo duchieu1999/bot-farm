@@ -484,33 +484,41 @@ async function processAccMessage4(msg) {
 
 
 
-const accRegex = /(\d+)\s*[^a-zA-Z\d]*acc\b/gi; // Regex tìm số acc
-const caRegex = /ca\s*(10h|12h|15h|18h|20h)\s*(\d{0,2})/gi; // Regex tìm ca theo khung giờ
-const postRegex = /(\d+)\s*b\b/gi; // Regex tìm số bài đăng chứa từ "b"
+// Regex để tìm số acc và ca
+const accRegex = /(\d+)\s*[^a-zA-Z\d]*acc\b/gi;
+const caRegex = /ca\s*(10h|12h|15h|18h30|20h)/gi;
 
-// Đăng ký sự kiện cho bot
+// Regex để tìm bài đăng
+const postRegex = /(\d+)\s*b\b/gi;
+
+// Xử lý sự kiện tin nhắn
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
 
-  // Chỉ xử lý nếu là nhóm xác định
-  if (chatId === -1002143712364) {
+  // Chỉ xử lý tin nhắn trong nhóm cụ thể
+  if (chatId == -1002143712364) {
     const messageContent = msg.text || msg.caption;
     if (messageContent) {
-      if (/bỏ/gi.test(messageContent)) return; // Bỏ qua nếu tin nhắn chứa "bỏ"
+      // Kiểm tra nếu tin nhắn chứa từ "bỏ"
+      const containsBo = /bỏ/gi.test(messageContent);
+      if (containsBo) {
+        return; // Bỏ qua nếu chứa từ "bỏ"
+      }
 
-      // Kiểm tra nội dung tin nhắn
+      // Tìm các khớp acc, ca và bài đăng
       const accMatches = [...messageContent.matchAll(accRegex)];
       const caMatches = [...messageContent.matchAll(caRegex)];
       const postMatches = [...messageContent.matchAll(postRegex)];
 
       if (accMatches.length > 0 && caMatches.length > 0) {
-        await processAccSubmission(msg, accMatches, caMatches); // Xử lý bài nộp số acc
+        await processAccSubmission(msg, accMatches, caMatches); // Xử lý nộp acc
       } else if (postMatches.length > 0) {
-        await processPostSubmission(msg, postMatches); // Xử lý bài nộp bài đăng
+        await processPostSubmission(msg, postMatches); // Xử lý bài đăng
       } else {
+        // Thông báo lỗi cú pháp
         bot.sendMessage(
           chatId,
-          'Bạn nộp sai cú pháp. Hãy ghi đúng như sau: "5 acc ca 10h00" hoặc "1b".',
+          'Bạn đã nhập sai cú pháp. Ví dụ:\n- Nộp acc: "Ca 10h00 5 acc"\n- Bài đăng: "3b"',
           { reply_to_message_id: msg.message_id }
         );
       }
@@ -518,6 +526,7 @@ bot.on('message', async (msg) => {
   }
 });
 
+// Hàm xử lý bài nộp số acc
 async function processAccSubmission(msg, accMatches, caMatches) {
   const userId = msg.from.id;
   const groupId = msg.chat.id;
@@ -526,18 +535,20 @@ async function processAccSubmission(msg, accMatches, caMatches) {
   const lastName = msg.from.last_name || '';
   const fullName = `${firstName} ${lastName}`.trim();
 
-  let caData = {};
+  let caData = {}; // Lưu số acc theo từng ca
   let totalAcc = 0;
 
-  // Tính tổng acc theo từng ca
-  caMatches.forEach((caMatch, index) => {
-    const caKey = `Ca${index + 1}`;
-    const accCount = accMatches[index] ? parseInt(accMatches[index][1]) : 0;
+  // Xử lý từng khớp ca và acc
+  caMatches.forEach((caMatch) => {
+    const caHour = caMatch[1].toLowerCase();
+    const caKey = mapCaHourToKey(caHour);
+    const accCount = accMatches.length > 0 ? parseInt(accMatches[0][1]) : 0;
+
     totalAcc += accCount;
-    caData[caKey] = accCount;
+    caData[caKey] = (caData[caKey] || 0) + accCount;
   });
 
-  // Giới hạn số acc tối đa
+  // Kiểm tra giới hạn số acc
   if (totalAcc > 30) {
     bot.sendMessage(
       groupId,
@@ -548,7 +559,7 @@ async function processAccSubmission(msg, accMatches, caMatches) {
   }
 
   // Tính tiền
-  const totalMoney = totalAcc * 5000; // Mỗi acc = 5.000 VNĐ
+  const totalMoney = totalAcc * 5000;
   const formattedMoney = totalMoney.toLocaleString('vi-VN', {
     style: 'currency',
     currency: 'VND',
@@ -563,10 +574,10 @@ async function processAccSubmission(msg, accMatches, caMatches) {
 
   bot.sendMessage(groupId, responseMessage, { reply_to_message_id: msg.message_id });
 
-  // Lưu dữ liệu vào MongoDB
-  const trasua = await Trasua.findOne({ userId, groupId, date: currentDate });
+  // Cập nhật vào cơ sở dữ liệu
+  let trasua = await Trasua.findOne({ userId, groupId, date: currentDate });
   if (!trasua) {
-    await Trasua.create({
+    trasua = await Trasua.create({
       userId,
       groupId,
       date: currentDate,
@@ -579,6 +590,7 @@ async function processAccSubmission(msg, accMatches, caMatches) {
     trasua.acc += totalAcc;
     trasua.tinh_tien += totalMoney;
 
+    trasua.caData = trasua.caData || {};
     for (let [ca, count] of Object.entries(caData)) {
       trasua.caData[ca] = (trasua.caData[ca] || 0) + count;
     }
@@ -586,6 +598,7 @@ async function processAccSubmission(msg, accMatches, caMatches) {
   }
 }
 
+// Hàm xử lý bài đăng
 async function processPostSubmission(msg, postMatches) {
   const userId = msg.from.id;
   const groupId = msg.chat.id;
@@ -594,10 +607,13 @@ async function processPostSubmission(msg, postMatches) {
   const lastName = msg.from.last_name || '';
   const fullName = `${firstName} ${lastName}`.trim();
 
-  // Tính tổng số bài đăng
-  const totalPosts = postMatches.reduce((sum, match) => sum + parseInt(match[1]), 0);
+  let totalPosts = 0;
 
-  // Tính tiền
+  // Tính tổng số bài đăng
+  postMatches.forEach((postMatch) => {
+    totalPosts += parseInt(postMatch[1]);
+  });
+
   const totalMoney = totalPosts * 1000; // Mỗi bài đăng = 1.000 VNĐ
   const formattedMoney = totalMoney.toLocaleString('vi-VN', {
     style: 'currency',
@@ -605,28 +621,47 @@ async function processPostSubmission(msg, postMatches) {
   });
 
   // Gửi thông báo
-  let responseMessage = `Bài nộp bài đăng của ${fullName} đã được ghi nhận.`;
+  let responseMessage = `Bài nộp của ${fullName} đã được ghi nhận.`;
   responseMessage += `\n- Tổng số bài đăng: ${totalPosts} (Tổng tiền: +${formattedMoney})`;
 
   bot.sendMessage(groupId, responseMessage, { reply_to_message_id: msg.message_id });
 
-  // Lưu dữ liệu vào MongoDB
-  const trasua = await Trasua.findOne({ userId, groupId, date: currentDate });
+  // Cập nhật vào cơ sở dữ liệu
+  let trasua = await Trasua.findOne({ userId, groupId, date: currentDate });
   if (!trasua) {
-    await Trasua.create({
+    trasua = await Trasua.create({
       userId,
       groupId,
       date: currentDate,
       ten: fullName,
-      bai_dang: totalPosts,
+      post: totalPosts,
       tinh_tien: totalMoney,
     });
   } else {
-    trasua.bai_dang = (trasua.bai_dang || 0) + totalPosts;
+    trasua.post = (trasua.post || 0) + totalPosts;
     trasua.tinh_tien += totalMoney;
     await trasua.save();
   }
 }
+
+// Hàm ánh xạ giờ thành khóa ca
+function mapCaHourToKey(hour) {
+  switch (hour) {
+    case '10h':
+      return 'Ca1';
+    case '12h':
+      return 'Ca2';
+    case '15h':
+      return 'Ca3';
+    case '18h30':
+      return 'Ca4';
+    case '20h':
+      return 'Ca5';
+    default:
+      return 'Unknown';
+  }
+}
+
 
 
 
