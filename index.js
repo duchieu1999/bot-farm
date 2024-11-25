@@ -2139,7 +2139,7 @@ const timeSlots = [
   { time: '11:30', label: 'ca 12h00' },
   { time: '14:30', label: 'ca 15h00' }, 
   { time: '18:00', label: 'ca 18h30' },
-  { time: '17:11', label: 'ca 20h00' }
+  { time: '17:33', label: 'ca 20h00' }
 ];
 
 const groupId = -1002333438294;
