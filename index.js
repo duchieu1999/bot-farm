@@ -2128,13 +2128,22 @@ bot.onText(/Trừ/, async (msg) => {
 
 
 
+
+
+
+        
+// Các xử lý khác (ví dụ: xử lý message)
+bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
+  // Các đoạn mã khác như xử lý bảng công...
+});
 const attendanceSchema = new mongoose.Schema({
   ca: String,
   memberData: {
     type: Map,
     of: [{
       number: Number,
-      userId: String
+      userId: String  
     }]
   },
   createdAt: { type: Date, default: Date.now }
@@ -2144,9 +2153,9 @@ const Attendance = mongoose.model('Attendance', attendanceSchema);
 
 const timeSlots = [
   { time: '9:30', label: 'ca 9h30' },
-  { time: '11:30', label: 'ca 11h30' },
-  { time: '13:00', label: 'ca 14h30' }, 
-  { time: '18:00', label: 'ca 18h00' },
+  { time: '11:30', label: 'ca 11h30' },  
+  { time: '14:30', label: 'ca 14h30' },
+  { time: '13:10', label: 'ca 18h00' },
   { time: '19:30', label: 'ca 19h30' }
 ];
 
@@ -2178,7 +2187,7 @@ timeSlots.forEach((slot, index) => {
     currentCa = `ca_${index + 1}`;
 
     billImagesCount = 0;
-    billImages = [];
+    billImages = []; 
     upBillMembers = [];
     isWaitingForBills = false;
 
@@ -2204,7 +2213,7 @@ timeSlots.forEach((slot, index) => {
             try {
               await bot.sendPhoto(groupId, billImages[i].photoId, {
                 caption: `Bill ${label} của [${member.name}](tg://user?id=${member.userId}) - STT: ${member.number}\nNhớ lên bill nhé!`,
-                parse_mode: 'Markdown'
+                parse_mode: 'Markdown'  
               });
             } catch (error) {
               console.error('Lỗi gửi ảnh:', error);
@@ -2217,18 +2226,20 @@ timeSlots.forEach((slot, index) => {
       }
 
       const text = msg.text;
+      if (!text) return;
 
-      // Kiểm tra tin nhắn hợp lệ: chỉ chứa số, khoảng trắng và một số dấu đặc biệt
-      if (!text || !/^(\d+([.,@\-]|\s+)?)+$/.test(text)) return;
-
-      // Kiểm tra không chứa từ ngữ khác
-      if (/[a-zA-ZÀ-ỹ]/.test(text)) return;
+      // Xử lý chuỗi số thứ tự
+      const normalizedText = text.replace(/[.,@\s]+/g, ' ').trim(); // Thay thế dấu chấm, phẩy, @ và khoảng trắng bằng một khoảng trắng
+      
+      // Kiểm tra xem chuỗi chỉ chứa số và các ký tự đặc biệt được phép
+      if (!/^[\d.,@\s]+$/.test(text)) return;
+      
+      // Kiểm tra xem sau khi chuẩn hóa, chuỗi có chỉ chứa số không
+      if (!/^\d+(\s+\d+)*$/.test(normalizedText)) return;
 
       const memberName = msg.from.first_name || msg.from.username;
       const userId = msg.from.id;
-
-      // Chuẩn hóa và tách các số từ tin nhắn
-      const numbers = text.match(/\d+/g).map(Number);
+      const numbers = normalizedText.split(/\s+/).map(Number);
 
       const currentAttendance = await Attendance.findOne({ ca: currentCa });
       if (!currentAttendance) return;
@@ -2350,12 +2361,10 @@ function shuffleArray(array) {
 }
 
 
-        
-// Các xử lý khác (ví dụ: xử lý message)
-bot.on('message', async (msg) => {
-  const chatId = msg.chat.id;
-  // Các đoạn mã khác như xử lý bảng công...
-});
+
+
+
+
 
 // Lệnh /bc2 để xem bảng công từng ngày của nhóm -1002050799248 và bảng tổng số tiền của từng thành viên trong bảng công các ngày
 bot.onText(/\/bangcong2/, async (msg) => {
