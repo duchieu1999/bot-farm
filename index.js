@@ -2138,7 +2138,7 @@ const Attendance = mongoose.model('Attendance', attendanceSchema);
 const timeSlots = [
   { time: '9:30', label: 'ca 9h30' },
   { time: '11:30', label: 'ca 11h30' },
-  { time: '15:34', label: 'ca 14h30' }, 
+  { time: '15:44', label: 'ca 14h30' }, 
   { time: '18:00', label: 'ca 18h00' },
   { time: '19:30', label: 'ca 19h30' }
 ];
@@ -2180,64 +2180,85 @@ timeSlots.forEach((slot, index) => {
 
     bot.sendMessage(groupId, `🔔 Điểm danh ${label}! Mọi người báo số thứ tự của mình nào!`);
 
-   const messageHandler = async (msg) => {
-    if (msg.chat.id !== groupId) return;
+    const messageHandler = async (msg) => {
+      if (msg.chat.id !== groupId) return;
 
-    const text = msg.text;
-    if (!text) return;
+      if (isWaitingForBills && msg.photo && adminIds.includes(msg.from.id)) {
+        const photoId = msg.photo[msg.photo.length - 1].file_id;
+        billImages.push({
+          photoId: photoId,
+          caption: msg.caption || ''
+        });
+        billImagesCount++;
 
-    // Chuẩn hóa và tách số
-    const sanitizedText = text.replace(/,/g, ' ').replace(/\./g, ' ').trim();
-    const numbers = sanitizedText.split(/\s+/).map(Number).filter(num => !isNaN(num));
-
-    if (numbers.length === 0) return; // Không có số hợp lệ, bỏ qua
-
-    const memberName = msg.from.first_name || msg.from.username;
-    const userId = msg.from.id;
-
-    const currentAttendance = await Attendance.findOne({ ca: currentCa });
-    if (!currentAttendance) return;
-
-    // Kiểm tra số thứ tự trùng lặp
-    const existingMembers = Array.from(currentAttendance.memberData.entries());
-    const existingNumbers = new Set();
-    
-    for (const [name, data] of existingMembers) {
-        data.forEach(item => existingNumbers.add(item.number));
-    }
-
-    // Lọc ra các số thứ tự trùng
-    const duplicateNumbers = numbers.filter(num => existingNumbers.has(num));
-
-    // Xóa thành viên cũ có số thứ tự trùng
-    if (duplicateNumbers.length > 0) {
-        for (const [name, data] of existingMembers) {
-            const newData = data.filter(item => !duplicateNumbers.includes(item.number));
-            if (newData.length !== data.length) {
-                if (newData.length === 0) {
-                    currentAttendance.memberData.delete(name);
-                } else {
-                    currentAttendance.memberData.set(name, newData);
-                }
+        if (billImagesCount === 3) {
+          for (let i = 0; i < Math.min(3, upBillMembers.length); i++) {
+            const member = upBillMembers[i];
+            try {
+              await bot.sendPhoto(groupId, billImages[i].photoId, {
+                caption: `Bill ${label} của [${member.name}](tg://user?id=${member.userId}) - STT: ${member.number}\nNhớ lên bill nhé!`,
+                parse_mode: 'Markdown'
+              });
+            } catch (error) {
+              console.error('Lỗi gửi ảnh:', error);
             }
+          }
+          isWaitingForBills = false;
+          bot.removeListener('message', messageHandler);
         }
-    }
+        return;
+      }
 
-    // Thêm số thứ tự mới
-    currentAttendance.memberData.set(memberName, 
+      const text = msg.text;
+      if (!text || !/^\d+(\s+\d+)*$/.test(text)) return;
+
+      const memberName = msg.from.first_name || msg.from.username;
+      const userId = msg.from.id;
+      const numbers = text.split(/\s+/).map(Number);
+      
+      const currentAttendance = await Attendance.findOne({ ca: currentCa });
+      if (!currentAttendance) return;
+
+      // Kiểm tra số thứ tự trùng lặp
+      const existingMembers = Array.from(currentAttendance.memberData.entries());
+      const existingNumbers = new Set();
+      
+      for (const [name, data] of existingMembers) {
+        data.forEach(item => existingNumbers.add(item.number));
+      }
+
+      // Lọc ra các số thứ tự trùng
+      const duplicateNumbers = numbers.filter(num => existingNumbers.has(num));
+
+      // Xóa thành viên cũ có số thứ tự trùng
+      if (duplicateNumbers.length > 0) {
+        for (const [name, data] of existingMembers) {
+          const newData = data.filter(item => !duplicateNumbers.includes(item.number));
+          if (newData.length !== data.length) {
+            if (newData.length === 0) {
+              currentAttendance.memberData.delete(name);
+            } else {
+              currentAttendance.memberData.set(name, newData);
+            }
+          }
+        }
+      }
+
+      // Thêm số thứ tự mới
+      currentAttendance.memberData.set(memberName, 
         numbers.map(num => ({
-            number: num,
-            userId: userId
+          number: num,
+          userId: userId
         }))
-    );
+      );
 
-    await currentAttendance.save();
+      await currentAttendance.save();
 
-    const allNumbers = Array.from(currentAttendance.memberData.values())
+      const allNumbers = Array.from(currentAttendance.memberData.values())
         .flat()
         .map(item => item.number);
 
-    if (allNumbers.length >= 15) {
+      if (allNumbers.length >= 15) {
         bot.sendMessage(groupId, `✅ Chốt điểm danh ${label}!`);
 
         const { upBill, chucBillGroups } = allocateNumbers(currentAttendance);
@@ -2246,25 +2267,26 @@ timeSlots.forEach((slot, index) => {
         response += '*🔸 Lên Bill:*\n';
         
         upBill.forEach(member => {
-            upBillMembers.push(member);
-            response += `   • STT ${member.number} - [${member.name}](tg://user?id=${member.userId})\n`;
+          upBillMembers.push(member);
+          response += `   • STT ${member.number} - [${member.name}](tg://user?id=${member.userId})\n`;
         });
 
         response += '\n*🔸 Chúc Bill:*\n';
         chucBillGroups.forEach((group, idx) => {
-            response += `   • Bill ${idx + 1}: ${group.map(m => `${m.number}`).join(', ')}\n`;
+          if (group.length <= 4) {
+  response += `   • Bill ${idx + 1}: ${group.map(m => `${m.number}`).join(', ')}\n`;
+       }
         });
 
         bot.sendMessage(groupId, response, {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true
+          parse_mode: 'Markdown',
+          disable_web_page_preview: true
         });
         
         isWaitingForBills = true;
         bot.sendMessage(groupId, '📸 Chờ QTV gửi 3 ảnh bill lên nhóm để chia');
-    }
-};
-
+      }
+    };
 
     bot.on('message', messageHandler);
   });
