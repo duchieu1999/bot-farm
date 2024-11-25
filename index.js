@@ -778,9 +778,16 @@ bot.onText(/\/333/, async (msg) => {
 
     let totalAmount = 50000; // Tiền quản lý
     let content = bangCongList.map(entry => {
-      const caData = ['Ca1', 'Ca2', 'Ca3', 'Ca4', 'Ca5'].map(ca => entry.caData?.[ca] || 0).join('</TD><TD ALIGN="CENTER">');
-      const posts = entry.post || 0;
-      return `${entry.ten}\t${caData}\t${posts}\t${entry.tinh_tien.toLocaleString()} vnđ`;
+      // Lấy thông tin số acc cho từng ca và số bài đăng
+      const caData = entry.caData || {};
+      const accCa1 = caData.Ca1 || 0;
+      const accCa2 = caData.Ca2 || 0;
+      const accCa3 = caData.Ca3 || 0;
+      const accCa4 = caData.Ca4 || 0;
+      const accCa5 = caData.Ca5 || 0;
+      const post = entry.post || 0;
+
+      return `${entry.ten}\t${accCa1}\t${accCa2}\t${accCa3}\t${accCa4}\t${accCa5}\t${post}\t${entry.tinh_tien.toLocaleString()} vnđ`;
     }).join('\n');
 
     // Tính tổng tiền công
@@ -800,21 +807,21 @@ bot.onText(/\/333/, async (msg) => {
             <TR><TD COLSPAN="8" ALIGN="CENTER" BGCOLOR="#FFCC00" STYLE="font-size: 16px; font-weight: bold;">${groupName} - ${dateStr}</TD></TR>
             <TR STYLE="font-weight: bold; background-color: #FFCC00;">
               <TD ALIGN="CENTER">Tên</TD>
-              <TD ALIGN="CENTER">Ca1</TD>
-              <TD ALIGN="CENTER">Ca2</TD>
-              <TD ALIGN="CENTER">Ca3</TD>
-              <TD ALIGN="CENTER">Ca4</TD>
-              <TD ALIGN="CENTER">Ca5</TD>
-              <TD ALIGN="CENTER">Bài Đăng</TD>
-              <TD ALIGN="CENTER">Tiền Công</TD>
+              <TD ALIGN="CENTER">Ca 1</TD>
+              <TD ALIGN="CENTER">Ca 2</TD>
+              <TD ALIGN="CENTER">Ca 3</TD>
+              <TD ALIGN="CENTER">Ca 4</TD>
+              <TD ALIGN="CENTER">Ca 5</TD>
+              <TD ALIGN="CENTER">Đăng Bài</TD>
+              <TD ALIGN="CENTER">Tiền công</TD>
             </TR>
             ${content.split('\n').map(line => `<TR><TD ALIGN="LEFT" STYLE="font-weight: bold;">${line.split('\t').join('</TD><TD ALIGN="CENTER">')}</TD></TR>`).join('')}
             <TR STYLE="font-weight: bold;">
-              <TD COLSPAN="7" ALIGN="LEFT">Quản lý</TD>
+              <TD COLSPAN="6" ALIGN="LEFT">Quản lý</TD>
               <TD ALIGN="CENTER">50,000 vnđ</TD>
             </TR>
             <TR STYLE="font-weight: bold;">
-              <TD COLSPAN="7" ALIGN="LEFT">Tổng số tiền</TD>
+              <TD COLSPAN="6" ALIGN="LEFT">Tổng số tiền</TD>
               <TD ALIGN="CENTER">${totalAmount.toLocaleString()} vnđ</TD>
             </TR>
           </TABLE>
@@ -861,6 +868,7 @@ bot.onText(/\/333/, async (msg) => {
     caption: `Tổng Kết Tiền Công Trong 3 Ngày`,
   });
 });
+
 
 
 
