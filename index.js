@@ -504,7 +504,7 @@ bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
 
   // Chỉ xử lý tin nhắn trong nhóm cụ thể
-  if (chatId == -1002143712364) {
+  if (chatId == -1002280909865) {
     const messageContent = msg.text || msg.caption;
     if (messageContent) {
       // Kiểm tra nếu tin nhắn chứa từ "bỏ"
