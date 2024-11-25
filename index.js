@@ -2139,7 +2139,7 @@ const timeSlots = [
   { time: '11:30', label: 'ca 12h00' },
   { time: '14:30', label: 'ca 15h00' }, 
   { time: '18:41', label: 'ca 18h30' },
-  { time: '17:33', label: 'ca 20h00' }
+  { time: '19:22', label: 'ca 20h00' }
 ];
 
 const groupId = -1002333438294;
@@ -2182,122 +2182,119 @@ timeSlots.forEach((slot, index) => {
     bot.sendMessage(groupId, `🔔 Điểm danh ${label}! Mọi người báo số thứ tự đi`);
 
     const messageHandler = async (msg) => {
-      if (msg.chat.id !== groupId) return;
+  if (msg.chat.id !== groupId) return;
 
-      if (isWaitingForBills && msg.photo && adminIds.includes(msg.from.id)) {
-        const photoId = msg.photo[msg.photo.length - 1].file_id;
-        billImages.push({
-          photoId: photoId,
-          caption: msg.caption || ''
-        });
-        billImagesCount++;
+  if (isWaitingForBills && msg.photo && adminIds.includes(msg.from.id)) {
+    const photoId = msg.photo[msg.photo.length - 1].file_id;
+    billImages.push({
+      photoId: photoId,
+      caption: msg.caption || ''
+    });
+    billImagesCount++;
 
-        if (billImagesCount === 3) {
-          for (let i = 0; i < Math.min(3, upBillMembers.length); i++) {
-            const member = upBillMembers[i];
-            try {
-              await bot.sendPhoto(groupId, billImages[i].photoId, {
-                caption: `Bill ${label} của [${member.name}](tg://user?id=${member.userId}) - STT: ${member.number}\n`,
-                parse_mode: 'Markdown'
-              });
-            } catch (error) {
-              console.error('Lỗi gửi ảnh:', error);
-            }
-          }
-          isWaitingForBills = false;
-          bot.removeListener('message', messageHandler);
+    if (billImagesCount === 3) {
+      for (let i = 0; i < Math.min(3, upBillMembers.length); i++) {
+        const member = upBillMembers[i];
+        try {
+          await bot.sendPhoto(groupId, billImages[i].photoId, {
+            caption: `Bill ${label} của [${member.name}](tg://user?id=${member.userId}) - STT: ${member.number}\n`,
+            parse_mode: 'Markdown'
+          });
+        } catch (error) {
+          console.error('Lỗi gửi ảnh:', error);
         }
-        return;
       }
+      isWaitingForBills = false;
+      bot.removeListener('message', messageHandler);
+    }
+    return;
+  }
 
-      const text = msg.text;
-      if (!text || !/^\d+([.,\s]+\d+)*$/.test(text)) return;
+  const text = msg.text;
+  if (!text || !/^\d+([.,\s]+\d+)*$/.test(text)) return;
 
-      const memberName = msg.from.first_name || msg.from.username;
-      const userId = msg.from.id;
-      const numbers = text.split(/[.,\s]+/).map(Number);
-      
-      const currentAttendance = await Attendance.findOne({ ca: currentCa });
-      if (!currentAttendance) return;
+  const memberName = msg.from.first_name || msg.from.username;
+  const userId = msg.from.id;
+  const numbers = text.split(/[.,\s]+/).map(Number);
+  
+  const currentAttendance = await Attendance.findOne({ ca: currentCa });
+  if (!currentAttendance) return;
 
-      // Kiểm tra số thứ tự trùng lặp
-      const existingMembers = Array.from(currentAttendance.memberData.entries());
-      const existingNumbers = new Set();
-      
-      for (const [name, data] of existingMembers) {
-        data.forEach(item => existingNumbers.add(item.number));
-      }
-
-      // Lọc ra các số thứ tự trùng
-      const duplicateNumbers = numbers.filter(num => existingNumbers.has(num));
-
-     // Xóa thành viên cũ có số thứ tự trùng
-if (duplicateNumbers.length > 0) {
+  // Kiểm tra số thứ tự trùng lặp với thành viên khác
+  const existingMembers = Array.from(currentAttendance.memberData.entries());
+  const existingNumbers = new Set();
+  
   for (const [name, data] of existingMembers) {
-    const newData = data.filter(item => !duplicateNumbers.includes(item.number));
-    if (newData.length !== data.length) {
-      if (newData.length === 0) {
-        currentAttendance.memberData.delete(name);
-      } else {
-        currentAttendance.memberData.set(name, newData);
+    if (name !== memberName) { // Chỉ kiểm tra số trùng với thành viên khác
+      data.forEach(item => existingNumbers.add(item.number));
+    }
+  }
+
+  // Lọc ra các số thứ tự trùng với thành viên khác
+  const duplicateNumbers = numbers.filter(num => existingNumbers.has(num));
+
+  // Xóa thành viên khác có số thứ tự trùng
+  if (duplicateNumbers.length > 0) {
+    for (const [name, data] of existingMembers) {
+      if (name !== memberName) { // Không xóa số của thành viên hiện tại
+        const newData = data.filter(item => !duplicateNumbers.includes(item.number));
+        if (newData.length !== data.length) {
+          if (newData.length === 0) {
+            currentAttendance.memberData.delete(name);
+          } else {
+            currentAttendance.memberData.set(name, newData);
+          }
+        }
       }
     }
   }
-}
 
-// Cập nhật lại dữ liệu vào Map
-currentAttendance.memberData.set(memberName, 
-  existingMembers.find(([name]) => name === memberName)[1] // Cập nhật thành viên này với số thứ tự mới
-);
+  // Thêm số thứ tự mới, giữ lại số cũ của thành viên
+  const existingData = currentAttendance.memberData.get(memberName) || [];
+  const newData = [
+    ...existingData,
+    ...numbers.map(num => ({
+      number: num,
+      userId: userId
+    }))
+  ];
+  currentAttendance.memberData.set(memberName, newData);
 
+  await currentAttendance.save();
 
-      // Thêm số thứ tự mới
-     // Thêm số thứ tự mới, cộng dồn với số cũ nếu thành viên đã tồn tại
-const existingMemberData = currentAttendance.memberData.get(memberName) || [];
-const newMemberData = [
-  ...existingMemberData,
-  ...numbers.map(num => ({
-    number: num,
-    userId: userId
-  }))
-];
-currentAttendance.memberData.set(memberName, newMemberData);
+  const allNumbers = Array.from(currentAttendance.memberData.values())
+    .flat()
+    .map(item => item.number);
 
-      await currentAttendance.save();
+  if (allNumbers.length >= 15) {
+    bot.sendMessage(groupId, `✅ Chốt điểm danh ${label}!`);
 
-      const allNumbers = Array.from(currentAttendance.memberData.values())
-        .flat()
-        .map(item => item.number);
+    const { upBill, chucBillGroups } = allocateNumbers(currentAttendance);
+    
+    let response = '🎉 *PHÂN CHIA BILL*\n\n';
+    response += '*🔸 Lên Bill:*\n';
+    
+    upBill.forEach(member => {
+      upBillMembers.push(member);
+      response += `   • STT ${member.number} - [${member.name}](tg://user?id=${member.userId})\n`;
+    });
 
-      if (allNumbers.length >= 15) {
-        bot.sendMessage(groupId, `✅ Chốt điểm danh ${label}!`);
-
-        const { upBill, chucBillGroups } = allocateNumbers(currentAttendance);
-        
-        let response = '🎉 *PHÂN CHIA BILL*\n\n';
-        response += '*🔸 Lên Bill:*\n';
-        
-        upBill.forEach(member => {
-          upBillMembers.push(member);
-          response += `   • STT ${member.number} - [${member.name}](tg://user?id=${member.userId})\n`;
-        });
-
-        response += '\n*🔸 Chúc Bill:*\n';
-        chucBillGroups.forEach((group, idx) => {
-          if (group.length <= 4) {
-  response += `   • Bill ${idx + 1}: ${group.map(m => `${m.number}`).join(', ')}\n`;
-       }
-        });
-
-        bot.sendMessage(groupId, response, {
-          parse_mode: 'Markdown',
-          disable_web_page_preview: true
-        });
-        
-        isWaitingForBills = true;
-        bot.sendMessage(groupId, '📸 Chờ QTV gửi 3 ảnh để chia bill');
+    response += '\n*🔸 Chúc Bill:*\n';
+    chucBillGroups.forEach((group, idx) => {
+      if (group.length <= 4) {
+        response += `   • Bill ${idx + 1}: ${group.map(m => `${m.number}`).join(', ')}\n`;
       }
-    };
+    });
+
+    bot.sendMessage(groupId, response, {
+      parse_mode: 'Markdown',
+      disable_web_page_preview: true
+    });
+    
+    isWaitingForBills = true;
+    bot.sendMessage(groupId, '📸 Chờ QTV gửi 3 ảnh để chia bill');
+  }
+};
 
     bot.on('message', messageHandler);
   });
