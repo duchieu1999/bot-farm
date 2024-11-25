@@ -2231,15 +2231,17 @@ timeSlots.forEach((slot, index) => {
       // Lọc ra các số thứ tự trùng
       const duplicateNumbers = numbers.filter(num => existingNumbers.has(num));
 
-      // Thay vì xóa số thứ tự đã báo trước, chúng ta cộng dồn số thứ tự mới
-for (const [name, data] of existingMembers) {
-  if (name === memberName) {
-    // Lọc ra các số thứ tự không trùng và thêm vào danh sách cũ
-    const newNumbers = numbers.filter(num => !existingNumbers.has(num));
-    data.push(...newNumbers.map(num => ({
-      number: num,
-      userId: userId
-    })));
+     // Xóa thành viên cũ có số thứ tự trùng
+if (duplicateNumbers.length > 0) {
+  for (const [name, data] of existingMembers) {
+    const newData = data.filter(item => !duplicateNumbers.includes(item.number));
+    if (newData.length !== data.length) {
+      if (newData.length === 0) {
+        currentAttendance.memberData.delete(name);
+      } else {
+        currentAttendance.memberData.set(name, newData);
+      }
+    }
   }
 }
 
@@ -2250,12 +2252,16 @@ currentAttendance.memberData.set(memberName,
 
 
       // Thêm số thứ tự mới
-      currentAttendance.memberData.set(memberName, 
-        numbers.map(num => ({
-          number: num,
-          userId: userId
-        }))
-      );
+     // Thêm số thứ tự mới, cộng dồn với số cũ nếu thành viên đã tồn tại
+const existingMemberData = currentAttendance.memberData.get(memberName) || [];
+const newMemberData = [
+  ...existingMemberData,
+  ...numbers.map(num => ({
+    number: num,
+    userId: userId
+  }))
+];
+currentAttendance.memberData.set(memberName, newMemberData);
 
       await currentAttendance.save();
 
