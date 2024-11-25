@@ -776,7 +776,6 @@ bot.onText(/\/333/, async (msg) => {
 
     let totalAmount = 50000;
     
-    // Tạo nội dung với các ca và bài đăng
     let content = bangCongList.map(entry => {
       const ca1 = (entry.caData?.Ca1 || 0) > 0 ? entry.caData.Ca1 : '-';
       const ca2 = (entry.caData?.Ca2 || 0) > 0 ? entry.caData.Ca2 : '-';
@@ -795,27 +794,30 @@ bot.onText(/\/333/, async (msg) => {
 
     const graph = `
       digraph G {
+        graph [fontname = "Roboto"];
+        node [fontname = "Roboto"];
+        edge [fontname = "Roboto"];
         node [shape=plaintext];
         a [label=<
-          <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" STYLE="font-family: 'Arial', sans-serif; border: 2px solid black;">
-            <TR><TD COLSPAN="9" ALIGN="CENTER" BGCOLOR="#2196F3" STYLE="font-size: 18px; font-weight: bold; color: white;">${groupName} - ${dateStr}</TD></TR>
-            <TR STYLE="font-weight: bold; background-color: #E3F2FD;">
-              <TD ALIGN="CENTER" STYLE="min-width: 120px;">Tên</TD>
-              <TD ALIGN="CENTER">Ca 1<BR/><FONT POINT-SIZE="10">(10h)</FONT></TD>
-              <TD ALIGN="CENTER">Ca 2<BR/><FONT POINT-SIZE="10">(12h)</FONT></TD>
-              <TD ALIGN="CENTER">Ca 3<BR/><FONT POINT-SIZE="10">(15h)</FONT></TD>
-              <TD ALIGN="CENTER">Ca 4<BR/><FONT POINT-SIZE="10">(18h30)</FONT></TD>
-              <TD ALIGN="CENTER">Ca 5<BR/><FONT POINT-SIZE="10">(20h)</FONT></TD>
+          <TABLE BORDER="2" CELLBORDER="1" CELLSPACING="0" CELLPADDING="8" STYLE="font-family: 'Montserrat', sans-serif; border: 3px solid black;">
+            <TR><TD COLSPAN="9" ALIGN="CENTER" BGCOLOR="#1976D2" STYLE="font-size: 24px; font-weight: bold; color: white; padding: 12px;">${groupName}<BR/><FONT POINT-SIZE="18">${dateStr}</FONT></TD></TR>
+            <TR STYLE="font-weight: bold; background-color: #2196F3; color: white;">
+              <TD ALIGN="CENTER" STYLE="min-width: 130px;">Tên</TD>
+              <TD ALIGN="CENTER">Ca 1<BR/><FONT POINT-SIZE="11">(10h)</FONT></TD>
+              <TD ALIGN="CENTER">Ca 2<BR/><FONT POINT-SIZE="11">(12h)</FONT></TD>
+              <TD ALIGN="CENTER">Ca 3<BR/><FONT POINT-SIZE="11">(15h)</FONT></TD>
+              <TD ALIGN="CENTER">Ca 4<BR/><FONT POINT-SIZE="11">(18h30)</FONT></TD>
+              <TD ALIGN="CENTER">Ca 5<BR/><FONT POINT-SIZE="11">(20h)</FONT></TD>
               <TD ALIGN="CENTER">Bài<BR/>đăng</TD>
               <TD ALIGN="CENTER">Tổng<BR/>Acc</TD>
-              <TD ALIGN="CENTER">Tiền công</TD>
+              <TD ALIGN="CENTER" STYLE="min-width: 100px;">Tiền công</TD>
             </TR>
-            ${content.split('\n').map(line => `<TR><TD ALIGN="LEFT" STYLE="font-weight: bold;">${line.split('\t').join('</TD><TD ALIGN="CENTER">')}</TD></TR>`).join('')}
-            <TR STYLE="font-weight: bold; background-color: #E3F2FD;">
+            ${content.split('\n').map(line => `<TR STYLE="font-size: 14px;"><TD ALIGN="LEFT" STYLE="font-weight: bold;">${line.split('\t').join('</TD><TD ALIGN="CENTER">')}</TD></TR>`).join('')}
+            <TR STYLE="font-weight: bold; background-color: #2196F3; color: white;">
               <TD COLSPAN="8" ALIGN="LEFT">Quản lý</TD>
               <TD ALIGN="CENTER">50,000 vnđ</TD>
             </TR>
-            <TR STYLE="font-weight: bold; background-color: #2196F3; color: white;">
+            <TR STYLE="font-weight: bold; background-color: #1976D2; color: white; font-size: 16px;">
               <TD COLSPAN="8" ALIGN="LEFT">Tổng số tiền</TD>
               <TD ALIGN="CENTER">${totalAmount.toLocaleString()} vnđ</TD>
             </TR>
@@ -836,16 +838,19 @@ bot.onText(/\/333/, async (msg) => {
 
   const totalGraph = `
     digraph G {
+      graph [fontname = "Roboto"];
+      node [fontname = "Roboto"];
+      edge [fontname = "Roboto"];
       node [shape=plaintext];
       a [label=<
-        <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" STYLE="font-family: 'Arial', sans-serif; border: 2px solid black;">
-          <TR><TD COLSPAN="2" ALIGN="CENTER" BGCOLOR="#2196F3" STYLE="font-size: 18px; font-weight: bold; color: white;">Tổng Tiền 3 Ngày</TD></TR>
-          <TR STYLE="font-weight: bold; background-color: #E3F2FD;">
-            <TD ALIGN="CENTER">Ngày</TD>
-            <TD ALIGN="CENTER">Tổng Tiền</TD>
+        <TABLE BORDER="2" CELLBORDER="1" CELLSPACING="0" CELLPADDING="8" STYLE="font-family: 'Montserrat', sans-serif; border: 3px solid black;">
+          <TR><TD COLSPAN="2" ALIGN="CENTER" BGCOLOR="#1976D2" STYLE="font-size: 24px; font-weight: bold; color: white; padding: 12px;">Tổng Tiền 3 Ngày</TD></TR>
+          <TR STYLE="font-weight: bold; background-color: #2196F3; color: white; font-size: 16px;">
+            <TD ALIGN="CENTER" STYLE="min-width: 120px;">Ngày</TD>
+            <TD ALIGN="CENTER" STYLE="min-width: 150px;">Tổng Tiền</TD>
           </TR>
-          ${dailyImages.map(({ dateStr, totalAmount }) => `<TR><TD ALIGN="CENTER">${dateStr}</TD><TD ALIGN="CENTER">${totalAmount.toLocaleString()} vnđ</TD></TR>`).join('')}
-          <TR STYLE="font-weight: bold; background-color: #2196F3; color: white;">
+          ${dailyImages.map(({ dateStr, totalAmount }) => `<TR STYLE="font-size: 14px;"><TD ALIGN="CENTER">${dateStr}</TD><TD ALIGN="CENTER">${totalAmount.toLocaleString()} vnđ</TD></TR>`).join('')}
+          <TR STYLE="font-weight: bold; background-color: #1976D2; color: white; font-size: 16px;">
             <TD ALIGN="LEFT">Tổng Cộng</TD>
             <TD ALIGN="CENTER">${grandTotal.toLocaleString()} vnđ</TD>
           </TR>
