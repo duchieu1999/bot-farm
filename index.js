@@ -2120,7 +2120,6 @@ bot.onText(/Trừ/, async (msg) => {
 
 
 
-
 const attendanceSchema = new mongoose.Schema({
   ca: String,
   memberData: {
