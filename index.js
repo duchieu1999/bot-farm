@@ -524,11 +524,7 @@ bot.on('message', async (msg) => {
         await processPostSubmission(msg, postMatches); // Xử lý bài đăng
       } else {
         // Thông báo lỗi cú pháp
-        bot.sendMessage(
-          chatId,
-          'Bạn đã nhập sai cú pháp. Ví dụ:\n- Nộp acc: "Ca 10h00 5 acc"\n- Bài đăng: "3b"',
-          { reply_to_message_id: msg.message_id }
-        );
+        
       }
     }
   }
