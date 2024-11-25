@@ -2138,11 +2138,11 @@ const timeSlots = [
   { time: '9:30', label: 'ca 10h00' },
   { time: '11:30', label: 'ca 12h00' },
   { time: '14:30', label: 'ca 15h00' }, 
-  { time: '18:41', label: 'ca 18h30' },
-  { time: '19:22', label: 'ca 20h00' }
+  { time: '18:00', label: 'ca 18h30' },
+  { time: '19:30', label: 'ca 20h00' }
 ];
 
-const groupId = -1002333438294;
+const groupId = -1002143712364;
 const adminIds = [7305842707];
 
 let billImagesCount = 0;
