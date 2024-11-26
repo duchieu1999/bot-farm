@@ -2018,7 +2018,7 @@ const timeSlots = [
   { time: '9:30', label: 'ca 10h00' },
   { time: '11:30', label: 'ca 12h00' },
   { time: '14:30', label: 'ca 15h00' }, 
-  { time: '16:40', label: 'ca 18h30' },
+  { time: '17:16', label: 'ca 18h30' },
   { time: '19:30', label: 'ca 20h00' }
 ];
 
@@ -2104,11 +2104,19 @@ timeSlots.forEach((slot, index) => {
           }
         }
 
-        // Cập nhật số thứ tự mới cho thành viên được reply
-        currentAttendance.memberData.set(memberName, numbers.map(num => ({
-          number: num,
-          userId: userId
-        })));
+        // Lấy dữ liệu hiện tại nếu có
+        const existingData = currentAttendance.memberData.get(memberName) || [];
+        const newData = [
+         ...existingData,
+       ...numbers.map(num => ({
+        number: num,
+        userId: userId
+         }))
+       ];
+
+       // Cập nhật lại dữ liệu vào Map
+       currentAttendance.memberData.set(memberName, newData);
+
 
         await currentAttendance.save();
 
