@@ -2017,7 +2017,7 @@ const Attendance = mongoose.model('Attendance', attendanceSchema);
 const timeSlots = [
   { time: '9:30', label: 'ca 10h00' },
   { time: '11:30', label: 'ca 12h00' },
-  { time: '15:45', label: 'ca 15h00' }, 
+  { time: '15:53', label: 'ca 15h00' }, 
   { time: '18:00', label: 'ca 18h30' },
   { time: '19:30', label: 'ca 20h00' }
 ];
