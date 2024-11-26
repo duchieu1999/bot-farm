@@ -2142,7 +2142,7 @@ const timeSlots = [
   { time: '19:30', label: 'ca 20h00' }
 ];
 
-const groupId = -1002143712364;
+const groupId = -1002280909865;
 const adminIds = [7305842707];
 
 let billImagesCount = 0;
