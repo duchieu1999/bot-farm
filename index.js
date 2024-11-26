@@ -299,7 +299,8 @@ async function processAccMessage3(msg) {
   const lastName = msg.from.last_name;
   const fullName = lastName ? `${firstName} ${lastName}` : firstName;
 
-  const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${acc} Acc, ${groups} nhóm. Tổng tiền: ${totalMoney.toLocaleString()} VNĐ ❤🥳`;
+  const randomEmoji = getRandomEmoji();
+  const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${acc} Acc, ${groups} nhóm. Tổng tiền: ${totalMoney.toLocaleString()} VNĐ ${randomEmoji}🥳`;
 
   bot.sendMessage(groupId, responseMessage, { reply_to_message_id: msg.message_id }).then(async () => {
     let trasua = await Trasua.findOne({ userId, groupId, date: currentDate });
@@ -383,7 +384,8 @@ async function processAccMessage5(msg) {
   const lastName = msg.from.last_name;
   const fullName = lastName ? `${firstName} ${lastName}` : firstName;
 
-  const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${acc} Acc, ${groups} nhóm. Tổng tiền: ${totalMoney.toLocaleString()} VNĐ ❤🥳`;
+  const randomEmoji = getRandomEmoji();
+  const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${acc} Acc, ${groups} nhóm. Tổng tiền: ${totalMoney.toLocaleString()} VNĐ ${randomEmoji}🥳`;
 
   bot.sendMessage(groupId, responseMessage, { reply_to_message_id: msg.message_id }).then(async () => {
     let trasua = await Trasua.findOne({ userId, groupId, date: currentDate });
@@ -463,7 +465,8 @@ async function processAccMessage4(msg) {
   let billMoney = bill * 2000; // Tính tiền cho số Bill
   totalMoney += billMoney; // Cộng tiền từ bill vào tổng tiền
 
-  const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${acc} Acc và ${bill} Bill đang chờ kiểm tra ❤🥳`;
+  const randomEmoji = getRandomEmoji();
+  const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${acc} Acc và ${bill} Bill đang chờ kiểm tra ${randomEmoji}🥳`;
 
   bot.sendMessage(groupId, responseMessage, { reply_to_message_id: msg.message_id }).then(async () => {
     let trasua = await Trasua.findOne({ userId, groupId, date: currentDate });
@@ -497,7 +500,7 @@ const accRegex = /(\d+)\s*[^a-zA-Z\d]*acc\b/gi;
 const caRegex = /ca\s*(10h|12h|15h|18h30|20h)/gi;
 
 // Regex để tìm bài đăng
-const postRegex = /(\d+)\s*b\b/gi;
+const postRegex = /(\d+)\s*[bB]\b/gi;
 
 // Xử lý sự kiện tin nhắn
 bot.on('message', async (msg) => {
@@ -570,9 +573,10 @@ async function processAccSubmission(msg, accMatches, caMatches) {
   });
 
   // Thông báo
+  const randomEmoji = getRandomEmoji();
   const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${Object.entries(caData)
     .map(([ca, count]) => `${ca}: ${count} Acc`)
-    .join(', ')} đang chờ kiểm tra ❤🥳.\nTổng tiền: +${formattedMoney}`;
+    .join(', ')} đang chờ kiểm tra ${randomEmoji}🥳. Tổng tiền: +${formattedMoney}`;
   bot.sendMessage(groupId, responseMessage, { reply_to_message_id: msg.message_id });
 
   // Cập nhật vào cơ sở dữ liệu
@@ -600,6 +604,7 @@ async function processAccSubmission(msg, accMatches, caMatches) {
 }
 
 // Hàm xử lý bài đăng
+// Hàm xử lý bài đăng
 async function processPostSubmission(msg, postMatches) {
   const userId = msg.from.id;
   const groupId = msg.chat.id;
@@ -610,10 +615,21 @@ async function processPostSubmission(msg, postMatches) {
 
   let totalPosts = 0;
 
-  // Tính tổng số bài đăng
+  // Tính tổng số bài đăng, chỉ nhận số đúng trước "b"
   postMatches.forEach((postMatch) => {
-    totalPosts += parseInt(postMatch[1]);
+    const number = parseInt(postMatch[1], 10);
+    if (!isNaN(number)) {
+      totalPosts += number;
+    }
   });
+
+  // Không ghi nhận nếu không có bài hợp lệ
+  if (totalPosts === 0) {
+    bot.sendMessage(groupId, '⛔ Tin nhắn không hợp lệ! Vui lòng chỉ gửi định dạng như "1b", "2b",...', {
+      reply_to_message_id: msg.message_id,
+    });
+    return;
+  }
 
   const totalMoney = totalPosts * 1000; // Mỗi bài đăng = 1.000 VNĐ
   const formattedMoney = totalMoney.toLocaleString('vi-VN', {
@@ -622,7 +638,8 @@ async function processPostSubmission(msg, postMatches) {
   });
 
   // Thông báo
-  const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${totalPosts} bài đăng đang chờ kiểm tra ❤🥳.\nTổng tiền: +${formattedMoney}`;
+  const randomEmoji = getRandomEmoji();
+  const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${totalPosts} bài đăng đang chờ kiểm tra ${randomEmoji}🥳. Tổng tiền: +${formattedMoney}`;
   bot.sendMessage(groupId, responseMessage, { reply_to_message_id: msg.message_id });
 
   // Cập nhật vào cơ sở dữ liệu
@@ -643,6 +660,7 @@ async function processPostSubmission(msg, postMatches) {
   }
 }
 
+
 // Hàm ánh xạ giờ thành khóa ca
 function mapCaHourToKey(hour) {
   switch (hour) {
@@ -659,6 +677,11 @@ function mapCaHourToKey(hour) {
     default:
       return 'Unknown';
   }
+}
+
+function getRandomEmoji() {
+  const emojis = ['❤️', '💖', '💙', '💜', '💕', '💚', '🧡', '🤍', '💔', '🩷'];
+  return emojis[Math.floor(Math.random() * emojis.length)];
 }
 
 
@@ -720,7 +743,8 @@ async function processAccMessage7(msg) {
   let totalMoney = acc * 4000; // Tính tiền cho số Acc
   const formattedMoney = totalMoney.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
 
-  const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${acc} Acc đang chờ kiểm tra ❤🥳.\nTổng tiền: +${formattedMoney}`;
+  const randomEmoji = getRandomEmoji();
+  const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${acc} Acc đang chờ kiểm tra ${randomEmoji}🥳.\nTổng tiền: +${formattedMoney}`;
 
   bot.sendMessage(groupId, responseMessage, { reply_to_message_id: msg.message_id }).then(async () => {
     let trasua = await Trasua.findOne({ userId, groupId, date: currentDate });
@@ -1132,151 +1156,6 @@ bot.onText(/Bỏ/, async (msg) => {
 
 
 
-// Lệnh /bc2 để xem bảng công từng ngày
-bot.onText(/\/nhom5k/, async (msg) => {
-  const chatId = msg.chat.id;
-
-  try {
-    const currentDate = new Date();
-
-    // Tính 3 ngày gần nhất
-    const threeDaysAgo = new Date();
-    threeDaysAgo.setDate(currentDate.getDate() - 3);
-
-    // Tìm tất cả bảng công trong nhóm và giới hạn 3 ngày gần nhất
-    const bangCongs = await BangCong2.find({
-      groupId: -1002143712364,
-      date: { $gte: threeDaysAgo.toLocaleDateString() }, // Chỉ lấy từ ngày 3 ngày trước
-    });
-
-    if (bangCongs.length === 0) {
-      bot.sendMessage(chatId, "Không có bảng công nào cho nhóm Be truly rich trong 3 ngày gần nhất.");
-      return;
-    }
-
-    // Phân loại bảng công theo ngày
-    const groupedByDate = {};
-    bangCongs.forEach((bangCong) => {
-      const date = bangCong.date;
-      if (!groupedByDate[date]) {
-        groupedByDate[date] = [];
-      }
-      groupedByDate[date].push(bangCong);
-    });
-
-    let response = '';
-
-    // Tạo bảng công cho từng ngày
-    for (const date in groupedByDate) {
-      const dayData = groupedByDate[date];
-      response += `Bảng công ngày ${date}:\n\n`;
-
-      dayData.forEach((bangCong) => {
-        const formattedTien = bangCong.tinh_tien.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-        response += `${bangCong.ten}\t\t${bangCong.acc} Acc\t${formattedTien}vnđ\n`;
-      });
-
-      response += '\n';
-    }
-
-    // Tính tổng số tiền của từng thành viên
-    const totalByMember = {};
-    bangCongs.forEach((bangCong) => {
-      if (!totalByMember[bangCong.ten]) {
-        totalByMember[bangCong.ten] = { acc: 0, tinh_tien: 0 };
-      }
-      totalByMember[bangCong.ten].acc += bangCong.acc;
-      totalByMember[bangCong.ten].tinh_tien += bangCong.tinh_tien;
-    });
-
-    response += 'Bảng tổng số tiền và số Acc của từng thành viên:\n\n';
-    let totalSum = 0;
-    for (const member in totalByMember) {
-      const memberData = totalByMember[member];
-      const formattedTotal = memberData.tinh_tien.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-      response += `${member}: ${memberData.acc} Acc\t${formattedTotal}vnđ\n`;
-      totalSum += memberData.tinh_tien;
-    }
-
-    // Tính tổng số tiền của tất cả thành viên
-    const formattedTotalSum = totalSum.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-    response += `\nTổng số tiền của tất cả thành viên: ${formattedTotalSum}vnđ\n`;
-
-    bot.sendMessage(chatId, response.trim());
-  } catch (error) {
-    console.error('Lỗi khi truy vấn bảng công:', error);
-    bot.sendMessage(chatId, 'Đã xảy ra lỗi khi truy vấn bảng công. Vui lòng thử lại.');
-  }
-});
-
-
-
-
-
-bot.onText(/delete/, async (msg) => {
-  if (!msg.reply_to_message || !msg.reply_to_message.text) {
-    bot.sendMessage(msg.chat.id, 'Hãy trả lời vào đúng tin nhắn xác nhận của bot để cập nhật.');
-    return;
-  }
-
-  const chatId = msg.chat.id;
-  const userId = msg.from.id;
-  const username = msg.from.username;
-
-  const replyText = msg.reply_to_message.text;
-
-  // Regex để bắt hai loại tin nhắn khác nhau
-  const matched = replyText.match(/Bài nộp của (.+) đã được ghi nhận với (\d+) Acc, (\d+) nhóm. Tổng tiền: ([\d,]+) VNĐ/) ||
-                  replyText.match(/Bài nộp của (.+) đã được ghi nhận với (\d+) Acc đang chờ kiểm tra/);
-
-  if (!matched) {
-    bot.sendMessage(chatId, 'Tin nhắn trả lời không đúng định dạng xác nhận của bot.');
-    return;
-  }
-
-  const ten = matched[1].trim();
-  const acc = parseInt(matched[2]);
-  const nhom = matched[3] ? parseInt(matched[3]) : 0; // Nếu không có nhóm, mặc định là 0
-  let tinh_tien = matched[4] ? parseInt(matched[4].replace(/,/g, '')) : 0; // Nếu không có tổng tiền, mặc định là 0
-
-  // Nếu không có tổng tiền và nhóm, trừ 2700 VNĐ cho mỗi acc
-  if (!matched[3] && !matched[4]) {
-    tinh_tien = acc * 7000;
-  }
-
-  // Lấy ngày từ tin nhắn của bot và định dạng là tháng/ngày/năm
-  const messageDate = new Date(msg.reply_to_message.date * 1000);
-  const formattedDate = `${messageDate.getMonth() + 1}/${messageDate.getDate()}/${messageDate.getFullYear()}`;
-
-  try {
-    const regex = new RegExp(normalizeName(ten).split('').join('.*'), 'i');
-
-    const trasua = await Trasua.findOne({
-      groupId: chatId,
-      ten: { $regex: regex },
-      date: formattedDate
-    });
-
-    if (!trasua) {
-      bot.sendMessage(chatId, `Không tìm thấy bản ghi để cập nhật cho ${ten}.`);
-      return;
-    }
-
-    // Cập nhật bản ghi
-    trasua.acc -= acc;
-    trasua.nhom -= nhom;
-    trasua.tinh_tien -= tinh_tien;
-
-    // Lưu bản ghi đã cập nhật
-    await trasua.save();
-
-    bot.sendMessage(chatId, `Trừ thành công bài nộp này cho ${ten}. Acc: -${acc}, Nhóm: -${nhom}, Tiền: -${tinh_tien.toLocaleString()} VNĐ`);
-  } catch (error) {
-    console.error('Lỗi khi cập nhật dữ liệu:', error);
-    bot.sendMessage(chatId, 'Đã xảy ra lỗi khi cập nhật dữ liệu.');
-  }
-});
-
 
 bot.onText(/\/123456/, async (msg) => {
   const chatId = msg.chat.id;
@@ -1428,8 +1307,9 @@ async function processSubmission(msg, targetMsg) {
   }
 
   const totalMoney = (quay * pricePerQuay) + (keo * pricePerKeo) + (bill * pricePerBill) + (anh * pricePerAnh) + pricePerKeoBonus + pricePerQuayBonus;
-
-  const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${quay} quẩy, ${keo} cộng, ${bill} bill, ${anh} ảnh vào ngày ${targetDate} lúc ${submissionTime} đang chờ kiểm tra ❤🥳. Tổng tiền: +${totalMoney.toLocaleString()} VNĐ`;
+  
+  const randomEmoji = getRandomEmoji();
+  const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${quay} quẩy, ${keo} cộng, ${bill} bill, ${anh} ảnh vào ngày ${targetDate} lúc ${submissionTime} đang chờ kiểm tra ${randomEmoji}🥳. Tổng tiền: +${totalMoney.toLocaleString()} VNĐ`;
 
   bot.sendMessage(groupId, responseMessage, { reply_to_message_id: msg.message_id }).then(async () => {
     let bangCong = await BangCong2.findOne({ userId, groupId, date: targetDate, submissionTime });
