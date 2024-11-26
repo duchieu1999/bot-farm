@@ -2018,7 +2018,7 @@ const timeSlots = [
   { time: '9:30', label: 'ca 10h00' },
   { time: '11:30', label: 'ca 12h00' },
   { time: '14:30', label: 'ca 15h00' }, 
-  { time: '17:16', label: 'ca 18h30' },
+  { time: '17:44', label: 'ca 18h30' },
   { time: '19:30', label: 'ca 20h00' }
 ];
 
@@ -2079,8 +2079,10 @@ timeSlots.forEach((slot, index) => {
         if (!currentAttendance) return;
 
         // Kiểm tra số thứ tự trùng lặp
-        const existingMembers = Array.from(currentAttendance.memberData.entries());
-        const existingNumbers = new Set();
+        const existingData = currentAttendance.memberData.get(memberName) || [];
+        const existingNumbers = existingData.map(item => item.number);
+        const uniqueNewNumbers = numbers.filter(num => !existingNumbers.includes(num));
+
         
         for (const [name, data] of existingMembers) {
           if (name !== memberName) {
@@ -2104,25 +2106,24 @@ timeSlots.forEach((slot, index) => {
           }
         }
 
-        // Lấy dữ liệu hiện tại nếu có
-        const existingData = currentAttendance.memberData.get(memberName) || [];
-        const newData = [
-         ...existingData,
-       ...numbers.map(num => ({
-        number: num,
-        userId: userId
-         }))
-       ];
+       
+// Thêm các số mới không trùng lặp vào danh sách
+        const updatedData = [
+          ...existingData,
+          ...uniqueNewNumbers.map(num => ({
+            number: num,
+            userId: userId
+          }))
+        ];
 
-       // Cập nhật lại dữ liệu vào Map
-       currentAttendance.memberData.set(memberName, newData);
+currentAttendance.memberData.set(memberName, updatedData);
 
+await currentAttendance.save();
 
-        await currentAttendance.save();
+bot.sendMessage(groupId, `✅ Đã thêm số thứ tự ${uniqueNewNumbers.join(', ')} cho [${memberName}](tg://user?id=${userId})`, {
+  parse_mode: 'Markdown'
+});
 
-        bot.sendMessage(groupId, `✅ Đã gán số thứ tự ${numbers.join(', ')} cho [${memberName}](tg://user?id=${userId})`, {
-          parse_mode: 'Markdown'
-        });
 
         // Kiểm tra điều kiện chốt sổ
         const allNumbers = Array.from(currentAttendance.memberData.values())
