@@ -499,8 +499,8 @@ async function processAccMessage4(msg) {
 const accRegex = /(\d+)\s*[^a-zA-Z\d]*acc\b/gi;
 const caRegex = /ca\s*(10h|12h|15h|18h30|20h)/gi;
 
-// Regex để tìm bài đăng
-const postRegex = /(\d+)\s*[bB]\b/gi;
+// Regex để tìm bài đăng (chỉ số và chữ "b" hợp lệ)
+const postRegex = /^\s*(\d+)\s*[bB]\s*$/gi;
 
 // Xử lý sự kiện tin nhắn
 bot.on('message', async (msg) => {
@@ -603,7 +603,7 @@ async function processAccSubmission(msg, accMatches, caMatches) {
   }
 }
 
-// Hàm xử lý bài đăng
+
 // Hàm xử lý bài đăng
 async function processPostSubmission(msg, postMatches) {
   const userId = msg.from.id;
@@ -617,11 +617,12 @@ async function processPostSubmission(msg, postMatches) {
 
   // Tính tổng số bài đăng, chỉ nhận số đúng trước "b"
   postMatches.forEach((postMatch) => {
-    const number = parseInt(postMatch[1], 10);
-    if (!isNaN(number)) {
-      totalPosts += number;
-    }
-  });
+  const number = parseInt(postMatch[1], 10);
+  if (!isNaN(number)) {
+    totalPosts += number;
+  }
+});
+
 
   // Không ghi nhận nếu không có bài hợp lệ
   if (totalPosts === 0) {
