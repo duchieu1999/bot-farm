@@ -2018,7 +2018,7 @@ const timeSlots = [
   { time: '9:30', label: 'ca 10h00' },
   { time: '11:30', label: 'ca 12h00' },
   { time: '14:30', label: 'ca 15h00' }, 
-  { time: '18:15', label: 'ca 18h30' },
+  { time: '18:44', label: 'ca 18h30' },
   { time: '19:30', label: 'ca 20h00' }
 ];
 
@@ -2062,10 +2062,9 @@ timeSlots.forEach((slot, index) => {
 
     bot.sendMessage(groupId, `🔔 Điểm danh ${label}! Mọi người báo số thứ tự đi`);
 
-    const messageHandler = async (msg) => {
+   const messageHandler = async (msg) => {
   if (msg.chat.id !== groupId) return;
 
-  // Handle bill photos from admin
   if (isWaitingForBills && msg.photo && adminIds.includes(msg.from.id)) {
     const photoId = msg.photo[msg.photo.length - 1].file_id;
     billImages.push({
@@ -2094,25 +2093,23 @@ timeSlots.forEach((slot, index) => {
 
   let text = msg.text;
   let targetUserId;
-  let targetName;
 
-  // Xử lý khi admin reply tin nhắn
-  if (msg.reply_to_message && adminIds.includes(msg.from.id)) {
-    const replyMsg = msg.reply_to_message;
-    targetUserId = replyMsg.from.id;
-    targetName = replyMsg.from.first_name || replyMsg.from.username;
-    
-    // Trích xuất số từ tin nhắn reply
-    const numberMatch = text.match(/\d+([.,\s]+\d+)*/g);
+  // Kiểm tra nếu là admin và đang reply một message
+  if (adminIds.includes(msg.from.id) && msg.reply_to_message) {
+    targetUserId = msg.reply_to_message.from.id;
+    // Trích xuất số từ nội dung reply
+    const numberMatch = text.match(/\d+/g);
     if (!numberMatch) return;
-    text = numberMatch[0];
-  } else {
-    // Xử lý tin nhắn thông thường
-    if (!text || !/^\d+([.,\s]+\d+)*$/.test(text)) return;
-    targetUserId = msg.from.id;
-    targetName = msg.from.first_name || msg.from.username;
+    text = numberMatch.join(' '); // Chuyển đổi mảng số thành chuỗi số cách nhau bởi dấu cách
   }
 
+  if (!text || !/^\d+([.,\s]+\d+)*$/.test(text)) return;
+
+  // Nếu là reply message, sử dụng thông tin của người được reply
+  const memberName = targetUserId ? 
+    (msg.reply_to_message.from.first_name || msg.reply_to_message.from.username) :
+    (msg.from.first_name || msg.from.username);
+  const userId = targetUserId || msg.from.id;
   const numbers = text.split(/[.,\s]+/).map(Number);
   
   const currentAttendance = await Attendance.findOne({ ca: currentCa });
@@ -2123,18 +2120,16 @@ timeSlots.forEach((slot, index) => {
   const existingNumbers = new Set();
   
   for (const [name, data] of existingMembers) {
-    if (name !== targetName) {
+    if (name !== memberName) {
       data.forEach(item => existingNumbers.add(item.number));
     }
   }
 
-  // Lọc ra các số thứ tự trùng với thành viên khác
   const duplicateNumbers = numbers.filter(num => existingNumbers.has(num));
 
-  // Xóa thành viên khác có số thứ tự trùng
   if (duplicateNumbers.length > 0) {
     for (const [name, data] of existingMembers) {
-      if (name !== targetName) {
+      if (name !== memberName) {
         const newData = data.filter(item => !duplicateNumbers.includes(item.number));
         if (newData.length === 0) {
           currentAttendance.memberData.delete(name);
@@ -2145,16 +2140,15 @@ timeSlots.forEach((slot, index) => {
     }
   }
 
-  // Thêm số thứ tự mới, giữ lại số cũ của thành viên
-  const existingData = currentAttendance.memberData.get(targetName) || [];
+  const existingData = currentAttendance.memberData.get(memberName) || [];
   const newData = [
     ...existingData,
     ...numbers.map(num => ({
       number: num,
-      userId: targetUserId
+      userId: userId
     }))
   ];
-  currentAttendance.memberData.set(targetName, newData);
+  currentAttendance.memberData.set(memberName, newData);
 
   await currentAttendance.save();
 
