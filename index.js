@@ -2005,6 +2005,7 @@ const attendanceSchema = new mongoose.Schema({
       userId: String
     }]
   },
+  isLocked: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now }
 });
 
@@ -2026,7 +2027,7 @@ const timeSlots = [
   { time: '9:30', label: 'ca 10h00' },
   { time: '11:30', label: 'ca 12h00' },
   { time: '14:30', label: 'ca 15h00' }, 
-  { time: '16:30', label: 'ca 18h30' },
+  { time: '16:58', label: 'ca 18h30' },
   { time: '19:30', label: 'ca 20h00' }
 ];
 
@@ -2067,7 +2068,7 @@ timeSlots.forEach((slot, index) => {
     upBillMembers = [];
     isWaitingForBills = false;
 
-    const attendance = new Attendance({ ca: currentCa, memberData: new Map() });
+    const attendance = new Attendance({ ca: currentCa, memberData: new Map(), isLocked: false });
     await attendance.save();
 
     bot.sendMessage(groupId, `🔔 Điểm danh ${label}! Mọi người báo số thứ tự đi`);
@@ -2132,7 +2133,11 @@ timeSlots.forEach((slot, index) => {
         const currentAttendance = await Attendance.findOne({ ca: currentCa });
         if (!currentAttendance) return;
 
-        // Check for duplicate numbers
+        if (currentAttendance.isLocked) {
+  return;
+}
+
+        // Check for duplicate numbers from other members
         const existingMembers = Array.from(currentAttendance.memberData.entries());
         const existingNumbers = new Set();
         
@@ -2157,31 +2162,33 @@ timeSlots.forEach((slot, index) => {
           }
         }
 
-        // Get existing numbers for current member
+         // Handle numbers for the current member
         const existingData = currentAttendance.memberData.get(memberName) || [];
-        const existingMemberNumbers = new Set(existingData.map(item => item.number));
-
-        // Filter out duplicate numbers from new numbers
-        const uniqueNewNumbers = newNumbers.filter(num => !existingMemberNumbers.has(num));
-
-        // Combine existing and new unique numbers
-        const combinedData = [
-          ...existingData,
-          ...uniqueNewNumbers.map(num => ({
-            number: num,
-            userId: userId
-          }))
-        ];
-
-        currentAttendance.memberData.set(memberName, combinedData);
-        await currentAttendance.save();
+        const existingNumbersSet = new Set(existingData.map(item => item.number));
+        
+        // Filter out numbers that this member already has
+        const newUniqueNumbers = numbers.filter(num => !existingNumbersSet.has(num));
+        
+        if (newUniqueNumbers.length > 0) {
+          const newData = [
+            ...existingData,
+            ...newUniqueNumbers.map(num => ({
+              number: num,
+              userId: userId
+            }))
+          ];
+          currentAttendance.memberData.set(memberName, newData);
+          await currentAttendance.save();
+        }
 
 
         const allNumbers = Array.from(currentAttendance.memberData.values())
           .flat()
           .map(item => item.number);
 
-        if (allNumbers.length >= 15) {
+       if (allNumbers.length >= 15 && !currentAttendance.isLocked) {
+       currentAttendance.isLocked = true; // Khóa bảng công
+       await currentAttendance.save();
           bot.sendMessage(groupId, `✅ Chốt điểm danh ${label}!`);
 
           // Get today's bill history
