@@ -2032,6 +2032,7 @@ const timeSlots = [
 
 const groupId = -1002280909865;
 const adminIds = [7305842707];
+const topicId = 10;
 
 let billImagesCount = 0;
 let billImages = [];
@@ -2094,13 +2095,16 @@ timeSlots.forEach((slot, index) => {
               try {
                 await bot.sendPhoto(groupId, billImages[i].photoId, {
                   caption: `Bill ${label} của [${member.name}](tg://user?id=${member.userId}) - STT: ${member.number}\n`,
-                  parse_mode: 'Markdown'
+                  parse_mode: 'Markdown',
+                  message_thread_id: topicId // Gửi vào thread cụ thể
                 });
               } catch (error) {
                 console.error('Lỗi gửi ảnh:', error);
               }
             }
             isWaitingForBills = false;
+            billImagesCount = 0;
+            billImages = [];
             bot.removeListener('message', messageHandler);
           }
           return;
