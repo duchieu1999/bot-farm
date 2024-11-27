@@ -1751,11 +1751,15 @@ async function processTotalTimesheet(chatId, numDays) {
     try {
         let totalAmountByUser = {};
 
+        // Lấy danh sách groupId
         const allGroupIds = await BangCong2.distinct('groupId', {
             date: { $gte: startDate, $lte: endDate },
         });
 
-        for (const groupId of allGroupIds) {
+        // Loại bỏ groupId thuộc allowedGroupIds
+        const filteredGroupIds = allGroupIds.filter(groupId => !allowedGroupIds.includes(groupId));
+
+        for (const groupId of filteredGroupIds) {
             const bangCongs = await BangCong2.find({
                 date: { $gte: startDate, $lte: endDate },
                 groupId: groupId,
