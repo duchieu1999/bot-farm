@@ -891,34 +891,29 @@ bot.onText(/\/333/, async (msg) => {
 
 
 
-bot.onText(/\/chaotopic/, async (msg) => {
-  const chatId = msg.chat.id;
+// ID của nhóm và thread
+const groupId44 = -1002280909865;
+const topicId44 = 10;
 
-  try {
-    // Lấy thông tin về các topic con của nhóm (nếu đây là một nhóm forum)
-    const forumTopics = await bot.getForumTopicList(chatId); // API này chỉ là giả lập, bạn cần lấy danh sách topic từ cách khác
-
-    if (!forumTopics || forumTopics.length === 0) {
-      bot.sendMessage(chatId, "Không có topic nào trong nhóm này.");
-      return;
-    }
-
-    // Chọn một topic con, ví dụ topic đầu tiên
-    const topic = forumTopics[0];
-    const messageThreadId = topic.message_thread_id;
-    const topicTitle = topic.title;
-
-    // Gửi tin nhắn "chào" vào topic con
-    await bot.sendMessage(chatId, "chào", { message_thread_id: messageThreadId });
-
-    // Gửi thông báo về tiêu đề của topic con
-    bot.sendMessage(chatId, `Đã gửi tin nhắn vào topic: ${topicTitle}`);
-  } catch (error) {
-    console.error("Lỗi khi lấy hoặc gửi tin nhắn vào topic con:", error);
-    bot.sendMessage(chatId, "Có lỗi xảy ra khi lấy hoặc gửi tin nhắn vào topic con.");
+// Lắng nghe lệnh /chaonha
+bot.onText(/\/chaonha/, (msg) => {
+  // Kiểm tra xem lệnh có được gửi từ đúng nhóm không
+  if (msg.chat.id === groupId44) {
+    bot.sendMessage(
+      groupId44,
+      `👋 Chào mừng mọi người đến với topic này!`,
+      {
+        message_thread_id: topicId44 // Gửi vào thread cụ thể
+      }
+    ).then(() => {
+      console.log('✅ Lời chào đã được gửi!');
+    }).catch((error) => {
+      console.error('❌ Lỗi khi gửi lời chào:', error);
+    });
+  } else {
+    bot.sendMessage(msg.chat.id, `Lệnh này chỉ hoạt động trong nhóm cụ thể.`);
   }
 });
-
       
 
 bot.onText(/\/13h/, async (msg) => {
