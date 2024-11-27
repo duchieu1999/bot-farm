@@ -1719,6 +1719,73 @@ async function processAndDistributeOtherTimesheets(chatId) {
 
 
 
+
+bot.onText(/\/tonghieu/, async (msg) => {
+    const chatId = msg.chat.id;
+
+    // Yêu cầu người dùng nhập số ngày
+    const promptMessage = await bot.sendMessage(chatId, 'Hãy nhập số ngày muốn xem tổng bảng công (mặc định là 3 ngày):', {
+        reply_markup: {
+            force_reply: true,
+        },
+    });
+
+    bot.onReplyToMessage(chatId, promptMessage.message_id, async (response) => {
+        let numDays = parseInt(response.text.trim());
+        if (isNaN(numDays) || numDays <= 0) {
+            numDays = 3; // Mặc định nếu nhập sai hoặc không nhập
+        }
+        await processTotalTimesheet(chatId, numDays);
+    });
+});
+
+async function processTotalTimesheet(chatId, numDays) {
+    const today = new Date();
+    const startDate = new Date();
+    startDate.setDate(today.getDate() - numDays);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date();
+    endDate.setDate(today.getDate() - 1);
+    endDate.setHours(23, 59, 59, 999);
+
+    try {
+        let totalAmountByUser = {};
+
+        const allGroupIds = await BangCong2.distinct('groupId', {
+            date: { $gte: startDate, $lte: endDate },
+        });
+
+        for (const groupId of allGroupIds) {
+            const bangCongs = await BangCong2.find({
+                date: { $gte: startDate, $lte: endDate },
+                groupId: groupId,
+            });
+
+            for (const bangCong of bangCongs) {
+                totalAmountByUser[bangCong.ten] = (totalAmountByUser[bangCong.ten] || 0) + bangCong.tinh_tien;
+            }
+        }
+
+        let totalAmountContent = '';
+        for (const [userName, totalAmount] of Object.entries(totalAmountByUser)) {
+            totalAmountContent += `<TR><TD ALIGN="LEFT" STYLE="font-weight: bold;">${userName}</TD><TD ALIGN="CENTER">${totalAmount}vnđ</TD></TR>`;
+        }
+
+        const dateRangeStr = `từ ${startDate.getDate()}/${startDate.getMonth() + 1}/${startDate.getFullYear()} đến ${endDate.getDate()}/${endDate.getMonth() + 1}/${endDate.getFullYear()}`;
+        const totalAmountImageUrl = await generateSummaryImage(totalAmountContent, dateRangeStr);
+
+        await bot.sendPhoto(chatId, totalAmountImageUrl);
+        bot.sendMessage(chatId, `Tổng bảng công trong ${numDays} ngày qua đã được gửi thành công.`);
+    } catch (error) {
+        console.error('Lỗi khi xử lý tổng bảng công:', error);
+        bot.sendMessage(chatId, 'Không thể tạo bảng tổng hợp. Vui lòng thử lại sau.');
+    }
+}
+
+
+
+
+
        
 const kickbot = {
   "-1002039100507": "CỘNG ĐỒNG NẮM BẮT CƠ HỘI",
