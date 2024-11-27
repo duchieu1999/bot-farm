@@ -2026,7 +2026,7 @@ const timeSlots = [
   { time: '9:30', label: 'ca 10h00' },
   { time: '11:30', label: 'ca 12h00' },
   { time: '14:30', label: 'ca 15h00' }, 
-  { time: '15:14', label: 'ca 18h30' },
+  { time: '16:30', label: 'ca 18h30' },
   { time: '19:30', label: 'ca 20h00' }
 ];
 
@@ -2157,17 +2157,25 @@ timeSlots.forEach((slot, index) => {
           }
         }
 
+        // Get existing numbers for current member
         const existingData = currentAttendance.memberData.get(memberName) || [];
-        const newData = [
+        const existingMemberNumbers = new Set(existingData.map(item => item.number));
+
+        // Filter out duplicate numbers from new numbers
+        const uniqueNewNumbers = newNumbers.filter(num => !existingMemberNumbers.has(num));
+
+        // Combine existing and new unique numbers
+        const combinedData = [
           ...existingData,
-          ...numbers.map(num => ({
+          ...uniqueNewNumbers.map(num => ({
             number: num,
             userId: userId
           }))
         ];
-        currentAttendance.memberData.set(memberName, newData);
 
+        currentAttendance.memberData.set(memberName, combinedData);
         await currentAttendance.save();
+
 
         const allNumbers = Array.from(currentAttendance.memberData.values())
           .flat()
