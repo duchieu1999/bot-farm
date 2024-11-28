@@ -34,7 +34,7 @@ const BangCongSchema = new mongoose.Schema({
   da_tru: { type: Boolean, default: false },
   giftWon: { type: Boolean, default: false },
   prizeAmount: { type: Number, default: 0 },
-  message_ids: { type: [Number], default: [] },
+  processedMessageIds: { type: [Number], default: [] }, // Thêm trường mới
   nhan_anh_bill: { type: Number, default: 0 } // Ensure default is 0
 });
 
@@ -1987,6 +1987,10 @@ bot.onText(/\/edit (.+)/, async (msg, match) => {
 
 
 
+const normalizeName = (name) => {
+  return name.replace(/[^\w\s]/gi, '').toLowerCase().trim();
+};
+
 bot.onText(/Trừ/, async (msg) => {
   if (!msg.reply_to_message || !msg.reply_to_message.text) {
     bot.sendMessage(msg.chat.id, 'Hãy trả lời vào đúng tin nhắn xác nhận của bot để cập nhật.');
@@ -1994,9 +1998,12 @@ bot.onText(/Trừ/, async (msg) => {
   }
 
   const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const username = msg.from.username;
   const replyText = msg.reply_to_message.text;
-  const replyMessageId = msg.reply_to_message.message_id;
+  const messageId = msg.reply_to_message.message_id;
 
+  // Kiểm tra và bắt các giá trị cần thiết từ nội dung tin nhắn
   const tenMatch = replyText.match(/Bài nộp của (.+?) đã được ghi nhận/);
   const quayMatch = replyText.match(/(\d+)\s+quẩy/);
   const keoMatch = replyText.match(/(\d+)\s+cộng/);
@@ -2017,31 +2024,36 @@ bot.onText(/Trừ/, async (msg) => {
   const totalMoney = parseInt(totalMoneyMatch[1].replace(/,/g, ''));
 
   try {
-    // Kiểm tra xem message_id đã tồn tại trong bản ghi nào chưa
+    const regex = new RegExp(normalizeName(ten).split('').join('.*'), 'i');
     const bangCong = await BangCong2.findOne({
       groupId: chatId,
-      message_ids: replyMessageId, // Tìm message_id trong mảng
+      ten: { $regex: regex },
     });
 
-    if (bangCong) {
+    if (!bangCong) {
+      bot.sendMessage(chatId, `Không tìm thấy bản ghi để cập nhật cho ${ten.trim()}.`);
+      return;
+    }
+
+    // Kiểm tra nếu bài nộp đã được xử lý
+    if (bangCong.processedMessageIds && bangCong.processedMessageIds.includes(messageId)) {
       bot.sendMessage(chatId, 'Trừ không thành công, bài nộp này đã được xử lý trước đó.');
       return;
     }
 
-    // Nếu chưa xử lý, cập nhật bản ghi
-    const regex = new RegExp(normalizeName(ten).split('').join('.*'), 'i');
-    const bangCongUpdate = await BangCong2.findOneAndUpdate(
-      {
-        groupId: chatId,
-        ten: { $regex: regex },
-        date: new Date(new Date().setHours(0, 0, 0, 0)), // Chỉ lấy ngày
-      },
-      {
-        $inc: { quay: -quay, keo: -keo, bill: -bill, anh: -anh, tinh_tien: -totalMoney },
-        $addToSet: { message_ids: replyMessageId }, // Thêm message_id vào mảng
-      },
-      { new: true, upsert: true }
-    );
+    // Cập nhật số liệu dựa trên thông tin đã lấy
+    bangCong.quay -= quay;
+    bangCong.keo -= keo;
+    bangCong.bill -= bill;
+    bangCong.anh -= anh;
+    bangCong.tinh_tien -= totalMoney;
+
+    // Thêm message_id vào danh sách đã xử lý
+    bangCong.processedMessageIds = bangCong.processedMessageIds || [];
+    bangCong.processedMessageIds.push(messageId);
+
+    // Lưu lại bản ghi đã chỉnh sửa
+    await bangCong.save();
 
     bot.sendMessage(chatId, `Trừ thành công bài nộp này cho ${ten.trim()}.`);
   } catch (error) {
@@ -2049,6 +2061,7 @@ bot.onText(/Trừ/, async (msg) => {
     bot.sendMessage(chatId, 'Đã xảy ra lỗi khi cập nhật dữ liệu.');
   }
 });
+
 
 
 
@@ -2084,7 +2097,7 @@ const billHistorySchema = new mongoose.Schema({
 const BillHistory = mongoose.model('BillHistory', billHistorySchema);
 
 const timeSlots = [
-  { time: '10:32', label: 'ca 10h00' },
+  { time: '10:45', label: 'ca 10h00' },
   { time: '11:30', label: 'ca 12h00' },
   { time: '14:30', label: 'ca 15h00' }, 
   { time: '18:00', label: 'ca 18h30' },
@@ -2101,7 +2114,6 @@ let upBillMembers = [];
 let isWaitingForBills = false;
 let currentCa = '';
 
-// Reset data at midnight
 schedule.scheduleJob('0 0 * * *', async () => {
   try {
     await Attendance.deleteMany({});
@@ -2247,42 +2259,39 @@ timeSlots.forEach((slot, index) => {
             date: { $gte: today }
           });
 
-          try {
-            const { upBill, chucBillGroups } = await allocateNumbers(currentAttendance, todayHistory);
-            
-            const newBillHistory = new BillHistory({
-              ca: currentCa,
-              members: upBill.map(m => ({
-                userId: m.userId,
-                name: m.name
-              }))
-            });
-            await newBillHistory.save();
+          const { upBill, chucBillGroups } = await allocateNumbers(currentAttendance, todayHistory);
+          
+          const newBillHistory = new BillHistory({
+            ca: currentCa,
+            members: upBill.map(m => ({
+              userId: m.userId,
+              name: m.name
+            }))
+          });
+          await newBillHistory.save();
 
-            let response = '🎉 *PHÂN CHIA BILL*\n\n';
-            response += '*🔸 Lên Bill:*\n';
-            
-            upBill.forEach(member => {
-              upBillMembers.push(member);
-              response += `   • STT ${member.number} - [${member.name}](tg://user?id=${member.userId})\n`;
-            });
+          let response = '🎉 *PHÂN CHIA BILL*\n\n';
+          response += '*🔸 Lên Bill:*\n';
+          
+          upBill.forEach(member => {
+            upBillMembers.push(member);
+            response += `   • STT ${member.number} - [${member.name}](tg://user?id=${member.userId})\n`;
+          });
 
-            response += '\n*🔸 Chúc Bill:*\n';
-            chucBillGroups.forEach((group, idx) => {
+          response += '\n*🔸 Chúc Bill:*\n';
+          chucBillGroups.forEach((group, idx) => {
+            if (group.length <= 4) {
               response += `   • Bill ${idx + 1}: ${group.map(m => `${m.number}`).join(', ')}\n`;
-            });
+            }
+          });
 
-            bot.sendMessage(groupId, response, {
-              parse_mode: 'Markdown',
-              disable_web_page_preview: true
-            });
-            
-            isWaitingForBills = true;
-            bot.sendMessage(groupId, '📸 Chờ QTV gửi 3 ảnh để chia bill');
-          } catch (error) {
-            console.error('Error in allocation:', error);
-            bot.sendMessage(groupId, '❌ Có lỗi xảy ra khi phân chia bill');
-          }
+          bot.sendMessage(groupId, response, {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true
+          });
+          
+          isWaitingForBills = true;
+          bot.sendMessage(groupId, '📸 Chờ QTV gửi 3 ảnh để chia bill');
         }
       } catch (error) {
         console.error('Error in message handler:', error);
@@ -2294,90 +2303,84 @@ timeSlots.forEach((slot, index) => {
 });
 
 async function allocateNumbers(attendance, todayHistory) {
-  const allMembers = [];
+  const membersByUser = new Map();
+  
   attendance.memberData.forEach((numbers, name) => {
     numbers.forEach(item => {
-      allMembers.push({
-        name: name,
-        number: item.number,
-        userId: item.userId
-      });
+      if (!membersByUser.has(item.userId)) {
+        membersByUser.set(item.userId, {
+          name: name,
+          userId: item.userId,
+          numbers: []
+        });
+      }
+      membersByUser.get(item.userId).numbers.push(item.number);
     });
   });
 
-  if (allMembers.length < 15) {
-    throw new Error('Not enough members for allocation');
-  }
+  const allMembers = Array.from(membersByUser.values()).map(member => ({
+    ...member,
+    randomScore: Math.random()
+  }));
 
   const todayBillMembers = new Set(
     todayHistory.flatMap(h => h.members.map(m => m.userId))
   );
 
-  const notUpYet = allMembers.filter(m => !todayBillMembers.has(m.userId));
-  const upBefore = allMembers.filter(m => todayBillMembers.has(m.userId));
+  const notUpYet = allMembers.filter(m => !todayBillMembers.has(m.userId))
+    .sort((a, b) => b.randomScore - a.randomScore);
+  const upBefore = allMembers.filter(m => todayBillMembers.has(m.userId))
+    .sort((a, b) => b.randomScore - a.randomScore);
 
-  let upBill = [];
-  
-  const uniqueNotUpMembers = [];
-  const seenUserIds = new Set();
-  
-  for (const member of notUpYet) {
-    if (!seenUserIds.has(member.userId)) {
-      uniqueNotUpMembers.push(member);
-      seenUserIds.add(member.userId);
-    }
-  }
-
-  const shuffledUniqueNotUp = shuffleArray([...uniqueNotUpMembers]);
-
-  if (shuffledUniqueNotUp.length >= 3) {
-    upBill = shuffledUniqueNotUp.slice(0, 3);
+  let selectedMembers;
+  if (notUpYet.length >= 3) {
+    selectedMembers = notUpYet.slice(0, 3);
   } else {
-    upBill = [...shuffledUniqueNotUp];
-    
-    const uniqueUpBefore = [];
-    const seenUpBeforeIds = new Set();
-    
-    for (const member of upBefore) {
-      if (!seenUpBeforeIds.has(member.userId)) {
-        uniqueUpBefore.push(member);
-        seenUpBeforeIds.add(member.userId);
+    selectedMembers = [
+      ...notUpYet,
+      ...upBefore.slice(0, 3 - notUpYet.length)
+    ];
+  }
+
+  const upBill = selectedMembers.map(member => ({
+    name: member.name,
+    userId: member.userId,
+    number: member.numbers[0]
+  }));
+
+  const remainingNumbers = [];
+  attendance.memberData.forEach((numbers, name) => {
+    numbers.forEach(item => {
+      if (!upBill.some(u => u.userId === item.userId)) {
+        remainingNumbers.push({
+          name: name,
+          number: item.number,
+          userId: item.userId
+        });
       }
-    }
+    });
+  });
 
-    const remainingNeeded = 3 - upBill.length;
-    const shuffledUpBefore = shuffleArray([...uniqueUpBefore]);
-    upBill = [...upBill, ...shuffledUpBefore.slice(0, remainingNeeded)];
-  }
-
-  const remaining = allMembers.filter(m => 
-    !upBill.some(u => u.userId === m.userId)
-  );
-
+  const shuffledRemaining = shuffleArray(remainingNumbers);
   const chucBillGroups = [];
-  const shuffledRemaining = shuffleArray([...remaining]);
-  
-  for (let i = 0; i < 3; i++) {
-    const groupStart = i * 4;
-    const group = shuffledRemaining.slice(groupStart, groupStart + 4);
-    chucBillGroups.push(group);
+  let currentGroup = [];
+
+  for (const member of shuffledRemaining) {
+    if (currentGroup.length >= 4) {
+      chucBillGroups.push(currentGroup);
+      currentGroup = [];
+    }
+    currentGroup.push(member);
   }
 
-  if (upBill.length !== 3) {
-    throw new Error('Failed to select exactly 3 members for up bill');
+  if (currentGroup.length > 0) {
+    chucBillGroups.push(currentGroup);
   }
 
-  if (chucBillGroups.length !== 3 || 
-      chucBillGroups.some(group => group.length !== 4)) {
-    throw new Error('Failed to create valid chuc bill groups');
-  }
-
-  const upBillUserIds = new Set(upBill.map(m => m.userId));
-  if (upBillUserIds.size !== 3) {
-    throw new Error('Duplicate users found in up bill selection');
-  }
-
-  return { upBill, chucBillGroups };
+  return {
+    upBill,
+    chucBillGroups: chucBillGroups.slice(0, 3)
+  };
 }
 
 function shuffleArray(array) {
