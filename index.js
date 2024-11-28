@@ -2068,11 +2068,7 @@ bot.onText(/Trừ/, async (msg) => {
 
 
 
-
-
-
-
-const attendanceSchema = new mongoose.Schema({
+attendanceSchema = new mongoose.Schema({
   ca: String,
   memberData: {
     type: Map,
@@ -2100,13 +2096,13 @@ const BillHistory = mongoose.model('BillHistory', billHistorySchema);
 
 const timeSlots = [
   { time: '9:30', label: 'ca 10h00' },
-  { time: '11:32', label: 'ca 12h00' },
+  { time: '12:42', label: 'ca 12h00' },
   { time: '14:30', label: 'ca 15h00' }, 
   { time: '18:00', label: 'ca 18h30' },
   { time: '19:30', label: 'ca 20h00' }
 ];
 
-const groupId = -1002280909865;
+const groupId = -1002333438294;
 const adminIds = [7305842707];
 const topicId = 10;
 
@@ -2348,8 +2344,6 @@ async function allocateNumbers(attendance, todayHistory) {
     number: member.numbers[0]
   }));
 
-  // Thay thế đoạn code cũ từ phần xử lý remainingNumbers bằng đoạn code sau:
-
   const remainingNumbers = [];
   attendance.memberData.forEach((numbers, name) => {
     numbers.forEach(item => {
@@ -2363,35 +2357,43 @@ async function allocateNumbers(attendance, todayHistory) {
     });
   });
 
-  // Tạo chính xác 3 nhóm
-  const chucBillGroups = [[], [], []];
+  const shuffledRemaining = shuffleArray(remainingNumbers);
+  const chucBillGroups = Array(3).fill().map(() => []);
   
-  // Xáo trộn ngẫu nhiên các số còn lại
-  const shuffledNumbers = shuffleArray([...remainingNumbers]);
-  
-  // Đảm bảo đủ 12 phần tử bằng cách lặp lại nếu thiếu
-  while (shuffledNumbers.length < 12) {
-    shuffledNumbers.push(...shuffleArray([...remainingNumbers]));
+  // Đảm bảo mỗi bill có đúng 4 số
+  for (let i = 0; i < 12 && i < shuffledRemaining.length; i++) {
+    const groupIndex = Math.floor(i / 4);
+    chucBillGroups[groupIndex].push(shuffledRemaining[i]);
   }
 
-  // Chia đều 12 số đầu tiên vào 3 nhóm
-  for (let i = 0; i < 12; i++) {
-    const groupIndex = Math.floor(i / 4);
-    chucBillGroups[groupIndex].push(shuffledNumbers[i]);
-  }
+  // Nếu thiếu số, thêm số ảo để đủ 4 số mỗi bill
+  chucBillGroups.forEach(group => {
+    while (group.length < 4) {
+      group.push({
+        name: "N/A",
+        number: 0,
+        userId: "0"
+      });
+    }
+  });
 
   return {
     upBill,
     chucBillGroups
   };
+}
 
-  function shuffleArray(array) {
+function shuffleArray(array) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [array[i], array[j]] = [array[j], array[i]];
   }
   return array;
 }
+
+
+
+
 
 
 
