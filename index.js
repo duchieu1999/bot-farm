@@ -35,7 +35,6 @@ const BangCongSchema = new mongoose.Schema({
   giftWon: { type: Boolean, default: false },
   prizeAmount: { type: Number, default: 0 },
   message_id: { type: Number, unique: true },
-},
   nhan_anh_bill: { type: Number, default: 0 } // Ensure default is 0
 });
 
