@@ -34,9 +34,7 @@ const BangCongSchema = new mongoose.Schema({
   da_tru: { type: Boolean, default: false },
   giftWon: { type: Boolean, default: false },
   prizeAmount: { type: Number, default: 0 },
-  processedMessageIds: {
-  type: [Number], // Lưu danh sách message_id
-  default: [],
+  message_id: { type: Number, unique: true },
 },
   nhan_anh_bill: { type: Number, default: 0 } // Ensure default is 0
 });
@@ -2000,10 +1998,9 @@ bot.onText(/Trừ/, async (msg) => {
     return;
   }
 
-  // Lấy thông tin từ tin nhắn bot mà người dùng trả lời
   const chatId = msg.chat.id;
-  const replyMessageId = msg.reply_to_message.message_id;
   const replyText = msg.reply_to_message.text;
+  const replyMessageId = msg.reply_to_message.message_id;
 
   // Kiểm tra và bắt các giá trị cần thiết từ nội dung tin nhắn
   const tenMatch = replyText.match(/Bài nộp của (.+?) đã được ghi nhận/);
@@ -2011,15 +2008,13 @@ bot.onText(/Trừ/, async (msg) => {
   const keoMatch = replyText.match(/(\d+)\s+cộng/);
   const billMatch = replyText.match(/(\d+)\s+bill/);
   const anhMatch = replyText.match(/(\d+)\s+ảnh/);
-  const submissionDateMatch = replyText.match(/vào (.+?) đang chờ kiểm tra/);
   const totalMoneyMatch = replyText.match(/Tổng tiền: \+?([\d,]+) VNĐ/);
 
-  if (!tenMatch || !quayMatch || !keoMatch || !billMatch || !anhMatch || !submissionDateMatch || !totalMoneyMatch) {
+  if (!tenMatch || !quayMatch || !keoMatch || !billMatch || !anhMatch || !totalMoneyMatch) {
     bot.sendMessage(chatId, 'Tin nhắn trả lời không đúng định dạng xác nhận của bot.');
     return;
   }
 
-  // Lấy thông tin từ tin nhắn trả lời
   const ten = tenMatch[1].trim();
   const quay = parseInt(quayMatch[1]);
   const keo = parseInt(keoMatch[1]);
@@ -2028,42 +2023,31 @@ bot.onText(/Trừ/, async (msg) => {
   const totalMoney = parseInt(totalMoneyMatch[1].replace(/,/g, ''));
 
   try {
-    // Kiểm tra xem `replyMessageId` đã được xử lý trước đó hay chưa
-    const existingRecord = await BangCong2.findOne({
+    // Tìm kiếm bài nộp dựa trên message_id
+    const bangCong = await BangCong2.findOne({
       groupId: chatId,
-      ten: normalizeName(ten),
-      processedMessageIds: { $in: [replyMessageId] },
+      message_id: replyMessageId, // Kiểm tra message_id
     });
 
-    if (existingRecord) {
+    if (bangCong) {
       bot.sendMessage(chatId, 'Trừ không thành công, bài nộp này đã được xử lý trước đó.');
       return;
     }
 
-    // Tìm bản ghi để cập nhật
-    const bangCong = await BangCong2.findOne({
-      groupId: chatId,
-      ten: normalizeName(ten),
-    });
-
-    if (!bangCong) {
-      bot.sendMessage(chatId, `Không tìm thấy bản ghi để cập nhật cho ${ten.trim()}.`);
-      return;
-    }
-
-    // Cập nhật số liệu dựa trên thông tin đã lấy
-    bangCong.quay -= quay;
-    bangCong.keo -= keo;
-    bangCong.bill -= bill;
-    bangCong.anh -= anh;
-    bangCong.tinh_tien -= totalMoney;
-
-    // Lưu message_id để đánh dấu bài nộp đã được xử lý
-    bangCong.processedMessageIds = bangCong.processedMessageIds || [];
-    bangCong.processedMessageIds.push(replyMessageId);
-
-    // Lưu lại bản ghi đã chỉnh sửa
-    await bangCong.save();
+    // Nếu chưa trừ, tạo mới hoặc cập nhật bản ghi
+    const regex = new RegExp(normalizeName(ten).split('').join('.*'), 'i');
+    const bangCongUpdate = await BangCong2.findOneAndUpdate(
+      {
+        groupId: chatId,
+        ten: { $regex: regex },
+        date: new Date(new Date().setHours(0, 0, 0, 0)), // Chỉ lấy ngày
+      },
+      {
+        $inc: { quay: -quay, keo: -keo, bill: -bill, anh: -anh, tinh_tien: -totalMoney },
+        $set: { message_id: replyMessageId },
+      },
+      { new: true, upsert: true }
+    );
 
     bot.sendMessage(chatId, `Trừ thành công bài nộp này cho ${ten.trim()}.`);
   } catch (error) {
@@ -2071,7 +2055,6 @@ bot.onText(/Trừ/, async (msg) => {
     bot.sendMessage(chatId, 'Đã xảy ra lỗi khi cập nhật dữ liệu.');
   }
 });
-
 
 
 
@@ -2094,7 +2077,6 @@ const attendanceSchema = new mongoose.Schema({
 
 const Attendance = mongoose.model('Attendance', attendanceSchema);
 
-// Schema for tracking members who went up for bills
 const billHistorySchema = new mongoose.Schema({
   date: { type: Date, default: Date.now },
   ca: String,
@@ -2107,14 +2089,14 @@ const billHistorySchema = new mongoose.Schema({
 const BillHistory = mongoose.model('BillHistory', billHistorySchema);
 
 const timeSlots = [
-  { time: '9:30', label: 'ca 10h00' },
+  { time: '10:04', label: 'ca 10h00' },
   { time: '11:30', label: 'ca 12h00' },
   { time: '14:30', label: 'ca 15h00' }, 
   { time: '18:00', label: 'ca 18h30' },
   { time: '19:30', label: 'ca 20h00' }
 ];
 
-const groupId = -1002280909865;
+const groupId = -1002333438294;
 const adminIds = [7305842707];
 const topicId = 10;
 
@@ -2128,7 +2110,7 @@ let currentCa = '';
 schedule.scheduleJob('0 0 * * *', async () => {
   try {
     await Attendance.deleteMany({});
-    await BillHistory.deleteMany({ date: { $lt: new Date() } }); // Delete previous day's history
+    await BillHistory.deleteMany({ date: { $lt: new Date() } });
     billImagesCount = 0;
     billImages = [];
     upBillMembers = [];
@@ -2159,7 +2141,6 @@ timeSlots.forEach((slot, index) => {
     const messageHandler = async (msg) => {
       if (msg.chat.id !== groupId) return;
 
-      // Check if user is an admin or has admin privileges
       try {
         const chatMember = await bot.getChatMember(groupId, msg.from.id);
         const isAdmin = adminIds.includes(msg.from.id) || 
@@ -2197,7 +2178,6 @@ timeSlots.forEach((slot, index) => {
         let text = msg.text;
         let targetUserId;
 
-        // Handle admin replies
         if (isAdmin && msg.reply_to_message) {
           targetUserId = msg.reply_to_message.from.id;
           const numberMatch = text.match(/\d+/g);
@@ -2214,13 +2194,8 @@ timeSlots.forEach((slot, index) => {
         const numbers = text.split(/[.,\s]+/).map(Number);
         
         const currentAttendance = await Attendance.findOne({ ca: currentCa });
-        if (!currentAttendance) return;
+        if (!currentAttendance || currentAttendance.isLocked) return;
 
-        if (currentAttendance.isLocked) {
-          return;
-        }
-
-        // Check for duplicate numbers from other members
         const existingMembers = Array.from(currentAttendance.memberData.entries());
         const existingNumbers = new Set();
         
@@ -2245,11 +2220,9 @@ timeSlots.forEach((slot, index) => {
           }
         }
 
-        // Handle numbers for the current member
         const existingData = currentAttendance.memberData.get(memberName) || [];
         const existingNumbersSet = new Set(existingData.map(item => item.number));
         
-        // Filter out numbers that this member already has
         const newUniqueNumbers = numbers.filter(num => !existingNumbersSet.has(num));
         
         if (newUniqueNumbers.length > 0) {
@@ -2273,47 +2246,48 @@ timeSlots.forEach((slot, index) => {
           await currentAttendance.save();
           bot.sendMessage(groupId, `✅ Chốt điểm danh ${label}!`);
 
-          // Get today's bill history
           const today = new Date();
           today.setHours(0, 0, 0, 0);
           const todayHistory = await BillHistory.find({
             date: { $gte: today }
           });
 
-          const { upBill, chucBillGroups } = await allocateNumbers(currentAttendance, todayHistory);
-          
-          // Save new bill history
-          const newBillHistory = new BillHistory({
-            ca: currentCa,
-            members: upBill.map(m => ({
-              userId: m.userId,
-              name: m.name
-            }))
-          });
-          await newBillHistory.save();
+          try {
+            const { upBill, chucBillGroups } = await allocateNumbers(currentAttendance, todayHistory);
+            
+            const newBillHistory = new BillHistory({
+              ca: currentCa,
+              members: upBill.map(m => ({
+                userId: m.userId,
+                name: m.name
+              }))
+            });
+            await newBillHistory.save();
 
-          let response = '🎉 *PHÂN CHIA BILL*\n\n';
-          response += '*🔸 Lên Bill:*\n';
-          
-          upBill.forEach(member => {
-            upBillMembers.push(member);
-            response += `   • STT ${member.number} - [${member.name}](tg://user?id=${member.userId})\n`;
-          });
+            let response = '🎉 *PHÂN CHIA BILL*\n\n';
+            response += '*🔸 Lên Bill:*\n';
+            
+            upBill.forEach(member => {
+              upBillMembers.push(member);
+              response += `   • STT ${member.number} - [${member.name}](tg://user?id=${member.userId})\n`;
+            });
 
-          response += '\n*🔸 Chúc Bill:*\n';
-          chucBillGroups.forEach((group, idx) => {
-            if (group.length <= 4) {
+            response += '\n*🔸 Chúc Bill:*\n';
+            chucBillGroups.forEach((group, idx) => {
               response += `   • Bill ${idx + 1}: ${group.map(m => `${m.number}`).join(', ')}\n`;
-            }
-          });
+            });
 
-          bot.sendMessage(groupId, response, {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true
-          });
-          
-          isWaitingForBills = true;
-          bot.sendMessage(groupId, '📸 Chờ QTV gửi 3 ảnh để chia bill');
+            bot.sendMessage(groupId, response, {
+              parse_mode: 'Markdown',
+              disable_web_page_preview: true
+            });
+            
+            isWaitingForBills = true;
+            bot.sendMessage(groupId, '📸 Chờ QTV gửi 3 ảnh để chia bill');
+          } catch (error) {
+            console.error('Error in allocation:', error);
+            bot.sendMessage(groupId, '❌ Có lỗi xảy ra khi phân chia bill');
+          }
         }
       } catch (error) {
         console.error('Error in message handler:', error);
@@ -2325,7 +2299,6 @@ timeSlots.forEach((slot, index) => {
 });
 
 async function allocateNumbers(attendance, todayHistory) {
-  // Tạo mảng chứa tất cả members và numbers
   const allMembers = [];
   attendance.memberData.forEach((numbers, name) => {
     numbers.forEach(item => {
@@ -2338,95 +2311,78 @@ async function allocateNumbers(attendance, todayHistory) {
   });
 
   if (allMembers.length < 15) {
-    throw new Error('Không đủ số lượng thành viên tối thiểu (15 người)');
+    throw new Error('Not enough members for allocation');
   }
 
-  // Tạo Set chứa userId của những người đã lên bill trong ngày
   const todayBillMembers = new Set(
     todayHistory.flatMap(h => h.members.map(m => m.userId))
   );
 
-  // Tách thành 2 mảng: chưa lên bill và đã lên bill
-  let notUpYet = allMembers.filter(m => !todayBillMembers.has(m.userId));
-  let upBefore = allMembers.filter(m => todayBillMembers.has(m.userId));
+  const notUpYet = allMembers.filter(m => !todayBillMembers.has(m.userId));
+  const upBefore = allMembers.filter(m => todayBillMembers.has(m.userId));
 
-  // Tạo Map để theo dõi số lần xuất hiện của mỗi userId
-  const userFrequency = new Map();
-  const userNumbers = new Map(); // Map để lưu trữ tất cả số của mỗi user
-
-  allMembers.forEach(m => {
-    userFrequency.set(m.userId, (userFrequency.get(m.userId) || 0) + 1);
-    if (!userNumbers.has(m.userId)) {
-      userNumbers.set(m.userId, []);
-    }
-    userNumbers.get(m.userId).push({
-      number: m.number,
-      name: m.name
-    });
-  });
-
-  // Đảm bảo luôn có 3 người lên bill
   let upBill = [];
   
-  // Ưu tiên người chưa lên bill
-  notUpYet = shuffleArray([...new Map(notUpYet.map(item => [item.userId, item])).values()]);
-  upBefore = shuffleArray([...new Map(upBefore.map(item => [item.userId, item])).values()]);
+  const uniqueNotUpMembers = [];
+  const seenUserIds = new Set();
   
-  // Thêm người chưa lên bill
-  upBill = [...notUpYet.slice(0, Math.min(3, notUpYet.length))];
-  
-  // Nếu chưa đủ 3 người, thêm từ những người đã lên bill
-  if (upBill.length < 3) {
-    // Sắp xếp theo số lần xuất hiện tăng dần
-    const sortedUpBefore = upBefore.sort((a, b) => 
-      userFrequency.get(a.userId) - userFrequency.get(b.userId)
-    );
-    
-    // Lấy thêm người cho đủ 3
-    const remaining = 3 - upBill.length;
-    const additionalMembers = sortedUpBefore
-      .filter(m => !upBill.some(u => u.userId === m.userId))
-      .slice(0, remaining);
-    
-    upBill = [...upBill, ...additionalMembers];
-  }
-
-  // Tạo mảng các số còn lại cho chúc bill
-  const remainingNumbers = allMembers.filter(m => 
-    !upBill.some(u => u.number === m.number)
-  );
-
-  // Chia chúc bill thành 3 nhóm, mỗi nhóm 4 số
-  const chucBillGroups = [];
-  let shuffledRemaining = shuffleArray([...remainingNumbers]);
-
-  // Đảm bảo đủ số lượng cho 3 nhóm chúc bill
-  while (shuffledRemaining.length < 12) {
-    shuffledRemaining = [...shuffledRemaining, ...shuffleArray([...remainingNumbers])];
-  }
-
-  // Chia thành 3 nhóm, mỗi nhóm 4 số
-  for (let i = 0; i < 3; i++) {
-    const group = shuffledRemaining.slice(i * 4, (i + 1) * 4);
-    if (group.length === 4) {
-      chucBillGroups.push(group);
+  for (const member of notUpYet) {
+    if (!seenUserIds.has(member.userId)) {
+      uniqueNotUpMembers.push(member);
+      seenUserIds.add(member.userId);
     }
   }
 
-  // Sắp xếp số thứ tự trong mỗi nhóm chúc bill
-  chucBillGroups.forEach(group => {
-    group.sort((a, b) => a.number - b.number);
-  });
+  const shuffledUniqueNotUp = shuffleArray([...uniqueNotUpMembers]);
 
-  return {
-    upBill: upBill.map(member => ({
-      ...member,
-      name: member.name,
-      userId: member.userId,
-      number: allMembers.find(m => m.userId === member.userId).number
-    })),
-    chucBillGroups
-  };
+  if (shuffledUniqueNotUp.length >= 3) {
+    upBill = shuffledUniqueNotUp.slice(0, 3);
+  } else {
+    upBill = [...shuffledUniqueNotUp];
+    
+    const uniqueUpBefore = [];
+    const seenUpBeforeIds = new Set();
+    
+    for (const member of upBefore) {
+      if (!seenUpBeforeIds.has(member.userId)) {
+        uniqueUpBefore.push(member);
+        seenUpBeforeIds.add(member.userId);
+      }
+    }
+
+    const remainingNeeded = 3 - upBill.length;
+    const shuffledUpBefore = shuffleArray([...uniqueUpBefore]);
+    upBill = [...upBill, ...shuffledUpBefore.slice(0, remainingNeeded)];
+  }
+
+  const remaining = allMembers.filter(m => 
+    !upBill.some(u => u.userId === m.userId)
+  );
+
+  const chucBillGroups = [];
+  const shuffledRemaining = shuffleArray([...remaining]);
+  
+  for (let i = 0; i < 3; i++) {
+    const groupStart = i * 4;
+    const group = shuffledRemaining.slice(groupStart, groupStart + 4);
+    chucBillGroups.push(group);
+  }
+
+  if (upBill.length !== 3) {
+    throw new Error('Failed to select exactly 3 members for up bill');
+  }
+
+  if (chucBillGroups.length !== 3 || 
+      chucBillGroups.some(group => group.length !== 4)) {
+    throw new Error('Failed to create valid chuc bill groups');
+  }
+
+  const upBillUserIds = new Set(upBill.map(m => m.userId));
+  if (upBillUserIds.size !== 3) {
+    throw new Error('Duplicate users found in up bill selection');
+  }
+
+  return { upBill, chucBillGroups };
 }
 
 function shuffleArray(array) {
