@@ -2156,6 +2156,7 @@ const createSubmission = async (data) => {
 
 
 
+
 const attendanceSchema = new mongoose.Schema({
   ca: String,
   memberData: {
@@ -2171,6 +2172,7 @@ const attendanceSchema = new mongoose.Schema({
 
 const Attendance = mongoose.model('Attendance', attendanceSchema);
 
+// Schema for tracking members who went up for bills
 const billHistorySchema = new mongoose.Schema({
   date: { type: Date, default: Date.now },
   ca: String,
@@ -2183,7 +2185,7 @@ const billHistorySchema = new mongoose.Schema({
 const BillHistory = mongoose.model('BillHistory', billHistorySchema);
 
 const timeSlots = [
-  { time: '8:56', label: 'ca 10h00' },
+  { time: '9:18', label: 'ca 10h00' },
   { time: '11:30', label: 'ca 12h00' },
   { time: '14:30', label: 'ca 15h00' }, 
   { time: '18:00', label: 'ca 18h30' },
@@ -2204,7 +2206,7 @@ let currentCa = '';
 schedule.scheduleJob('0 0 * * *', async () => {
   try {
     await Attendance.deleteMany({});
-    await BillHistory.deleteMany({ date: { $lt: new Date() } });
+    await BillHistory.deleteMany({ date: { $lt: new Date() } }); // Delete previous day's history
     billImagesCount = 0;
     billImages = [];
     upBillMembers = [];
@@ -2235,6 +2237,7 @@ timeSlots.forEach((slot, index) => {
     const messageHandler = async (msg) => {
       if (msg.chat.id !== groupId) return;
 
+      // Check if user is an admin or has admin privileges
       try {
         const chatMember = await bot.getChatMember(groupId, msg.from.id);
         const isAdmin = adminIds.includes(msg.from.id) || 
@@ -2272,6 +2275,7 @@ timeSlots.forEach((slot, index) => {
         let text = msg.text;
         let targetUserId;
 
+        // Handle admin replies
         if (isAdmin && msg.reply_to_message) {
           targetUserId = msg.reply_to_message.from.id;
           const numberMatch = text.match(/\d+/g);
@@ -2288,8 +2292,13 @@ timeSlots.forEach((slot, index) => {
         const numbers = text.split(/[.,\s]+/).map(Number);
         
         const currentAttendance = await Attendance.findOne({ ca: currentCa });
-        if (!currentAttendance || currentAttendance.isLocked) return;
+        if (!currentAttendance) return;
 
+        if (currentAttendance.isLocked) {
+          return;
+        }
+
+        // Check for duplicate numbers from other members
         const existingMembers = Array.from(currentAttendance.memberData.entries());
         const existingNumbers = new Set();
         
@@ -2314,8 +2323,11 @@ timeSlots.forEach((slot, index) => {
           }
         }
 
+        // Handle numbers for the current member
         const existingData = currentAttendance.memberData.get(memberName) || [];
         const existingNumbersSet = new Set(existingData.map(item => item.number));
+        
+        // Filter out numbers that this member already has
         const newUniqueNumbers = numbers.filter(num => !existingNumbersSet.has(num));
         
         if (newUniqueNumbers.length > 0) {
@@ -2339,6 +2351,7 @@ timeSlots.forEach((slot, index) => {
           await currentAttendance.save();
           bot.sendMessage(groupId, `✅ Chốt điểm danh ${label}!`);
 
+          // Get today's bill history
           const today = new Date();
           today.setHours(0, 0, 0, 0);
           const todayHistory = await BillHistory.find({
@@ -2347,6 +2360,7 @@ timeSlots.forEach((slot, index) => {
 
           const { upBill, chucBillGroups } = await allocateNumbers(currentAttendance, todayHistory);
           
+          // Save new bill history
           const newBillHistory = new BillHistory({
             ca: currentCa,
             members: upBill.map(m => ({
@@ -2400,32 +2414,55 @@ async function allocateNumbers(attendance, todayHistory) {
     });
   });
 
-  // Lấy danh sách những người đã lên bill hôm nay
+  // Tạo Set chứa userId của những người đã lên bill trong ngày
   const todayBillMembers = new Set(
     todayHistory.flatMap(h => h.members.map(m => m.userId))
   );
 
-  // Lọc ra những người chưa lên bill
+  // Tách thành 2 mảng: chưa lên bill và đã lên bill
   const notUpYet = allMembers.filter(m => !todayBillMembers.has(m.userId));
+  const upBefore = allMembers.filter(m => todayBillMembers.has(m.userId));
+
+  // Tạo Map để đếm số lần xuất hiện của mỗi userId
+  const userFrequency = new Map();
+  allMembers.forEach(m => {
+    userFrequency.set(m.userId, (userFrequency.get(m.userId) || 0) + 1);
+  });
+
+  let upBill = [];
   
-  let upBill;
-  if (notUpYet.length >= 2) {
-    // Nếu có đủ người chưa lên bill, chọn ngẫu nhiên 2-3 người từ danh sách này
-    const numToSelect = Math.floor(Math.random() * 2) + 2; // Random 2-3 người
-    upBill = shuffleArray(notUpYet).slice(0, numToSelect);
+  // Xử lý logic chọn người lên bill
+  if (notUpYet.length >= 3) {
+    // Nếu đủ người chưa lên bill, chọn ngẫu nhiên 3 người
+    upBill = shuffleArray([...notUpYet]).slice(0, 3);
   } else {
-    // Nếu không đủ người chưa lên bill, thì bổ sung thêm từ những người đã lên bill
-    const upBefore = allMembers.filter(m => todayBillMembers.has(m.userId));
-    const numNeeded = Math.floor(Math.random() * 2) + 2 - notUpYet.length;
-    const fillMembers = shuffleArray(upBefore).slice(0, numNeeded);
-    upBill = [...notUpYet, ...fillMembers];
+    // Nếu không đủ người chưa lên bill:
+    // 1. Thêm tất cả người chưa lên bill vào trước
+    upBill = [...notUpYet];
+    
+    // 2. Sắp xếp những người đã lên bill theo số lần xuất hiện tăng dần
+    const sortedUpBefore = [...upBefore].sort((a, b) => 
+      userFrequency.get(a.userId) - userFrequency.get(b.userId)
+    );
+    
+    // 3. Bổ sung thêm người cho đủ 3 người
+    const remainingNeeded = 3 - upBill.length;
+    const additionalMembers = shuffleArray(sortedUpBefore)
+      .filter(m => !upBill.some(u => u.userId === m.userId))
+      .slice(0, remainingNeeded);
+    
+    upBill = [...upBill, ...additionalMembers];
   }
 
-  // Xử lý phần còn lại cho chúc bill
+  // Đảm bảo 3 người lên bill là khác nhau
+  upBill = Array.from(new Map(upBill.map(item => [item.userId, item])).values());
+  
+  // Xử lý những người còn lại cho chúc bill
   const remaining = allMembers.filter(m => 
     !upBill.some(u => u.userId === m.userId)
   );
   
+  // Chia nhóm chúc bill
   const chucBillGroups = [];
   let currentGroup = [];
   
