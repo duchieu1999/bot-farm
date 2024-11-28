@@ -2096,7 +2096,7 @@ const BillHistory = mongoose.model('BillHistory', billHistorySchema);
 
 const timeSlots = [
   { time: '9:30', label: 'ca 10h00' },
-  { time: '12:48', label: 'ca 12h00' },
+  { time: '12:57', label: 'ca 12h00' },
   { time: '14:30', label: 'ca 15h00' }, 
   { time: '18:00', label: 'ca 18h30' },
   { time: '19:30', label: 'ca 20h00' }
@@ -2298,6 +2298,8 @@ timeSlots.forEach((slot, index) => {
   });
 });
 
+// [Giữ nguyên các phần code khác ở trên]
+
 async function allocateNumbers(attendance, todayHistory) {
   const membersByUser = new Map();
   
@@ -2344,10 +2346,11 @@ async function allocateNumbers(attendance, todayHistory) {
     number: member.numbers[0]
   }));
 
+  // Lấy tất cả các số còn lại (không lên bill)
   const remainingNumbers = [];
   attendance.memberData.forEach((numbers, name) => {
     numbers.forEach(item => {
-      if (!upBill.some(u => u.userId === item.userId)) {
+      if (!upBill.some(u => u.number === item.number)) {
         remainingNumbers.push({
           name: name,
           number: item.number,
@@ -2357,23 +2360,32 @@ async function allocateNumbers(attendance, todayHistory) {
     });
   });
 
-  const shuffledRemaining = shuffleArray(remainingNumbers);
-  const chucBillGroups = Array(3).fill().map(() => []);
+  // Xáo trộn các số còn lại
+  const shuffledRemaining = shuffleArray([...remainingNumbers]);
   
-  // Đảm bảo mỗi bill có đúng 4 số
-  for (let i = 0; i < 12 && i < shuffledRemaining.length; i++) {
-    const groupIndex = Math.floor(i / 4);
-    chucBillGroups[groupIndex].push(shuffledRemaining[i]);
+  // Khởi tạo 3 bill trống
+  const chucBillGroups = [[], [], []];
+
+  // Chia đều 12 số đầu tiên vào 3 bill, mỗi bill 4 số
+  for (let i = 0; i < Math.min(12, shuffledRemaining.length); i++) {
+    const billIndex = Math.floor(i / 4);
+    chucBillGroups[billIndex].push(shuffledRemaining[i]);
   }
 
-  // Nếu thiếu số, thêm số ảo để đủ 4 số mỗi bill
-  chucBillGroups.forEach(group => {
+  // Nếu không đủ 12 số, thêm các số còn thiếu vào từng bill để đảm bảo mỗi bill có 4 số
+  chucBillGroups.forEach((group, index) => {
     while (group.length < 4) {
-      group.push({
-        name: "N/A",
-        number: 0,
-        userId: "0"
-      });
+      const remainingIndex = index * 4 + group.length;
+      if (remainingIndex < shuffledRemaining.length) {
+        group.push(shuffledRemaining[remainingIndex]);
+      } else {
+        // Nếu không còn số thật, thêm số 0 (trường hợp này không nên xảy ra trong thực tế)
+        group.push({
+          name: "N/A",
+          number: 0,
+          userId: "0"
+        });
+      }
     }
   });
 
@@ -2390,6 +2402,8 @@ function shuffleArray(array) {
   }
   return array;
 }
+
+// [Giữ nguyên các phần code khác ở dưới]
 
 
 
