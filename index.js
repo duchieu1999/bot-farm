@@ -2403,6 +2403,7 @@ timeSlots.forEach((slot, index) => {
 });
 
 async function allocateNumbers(attendance, todayHistory) {
+  // Tạo mảng chứa tất cả members và numbers
   const allMembers = [];
   attendance.memberData.forEach((numbers, name) => {
     numbers.forEach(item => {
@@ -2414,73 +2415,95 @@ async function allocateNumbers(attendance, todayHistory) {
     });
   });
 
+  if (allMembers.length < 15) {
+    throw new Error('Không đủ số lượng thành viên tối thiểu (15 người)');
+  }
+
   // Tạo Set chứa userId của những người đã lên bill trong ngày
   const todayBillMembers = new Set(
     todayHistory.flatMap(h => h.members.map(m => m.userId))
   );
 
   // Tách thành 2 mảng: chưa lên bill và đã lên bill
-  const notUpYet = allMembers.filter(m => !todayBillMembers.has(m.userId));
-  const upBefore = allMembers.filter(m => todayBillMembers.has(m.userId));
+  let notUpYet = allMembers.filter(m => !todayBillMembers.has(m.userId));
+  let upBefore = allMembers.filter(m => todayBillMembers.has(m.userId));
 
-  // Tạo Map để đếm số lần xuất hiện của mỗi userId
+  // Tạo Map để theo dõi số lần xuất hiện của mỗi userId
   const userFrequency = new Map();
+  const userNumbers = new Map(); // Map để lưu trữ tất cả số của mỗi user
+
   allMembers.forEach(m => {
     userFrequency.set(m.userId, (userFrequency.get(m.userId) || 0) + 1);
+    if (!userNumbers.has(m.userId)) {
+      userNumbers.set(m.userId, []);
+    }
+    userNumbers.get(m.userId).push({
+      number: m.number,
+      name: m.name
+    });
   });
 
+  // Đảm bảo luôn có 3 người lên bill
   let upBill = [];
   
-  // Xử lý logic chọn người lên bill
-  if (notUpYet.length >= 3) {
-    // Nếu đủ người chưa lên bill, chọn ngẫu nhiên 3 người
-    upBill = shuffleArray([...notUpYet]).slice(0, 3);
-  } else {
-    // Nếu không đủ người chưa lên bill:
-    // 1. Thêm tất cả người chưa lên bill vào trước
-    upBill = [...notUpYet];
-    
-    // 2. Sắp xếp những người đã lên bill theo số lần xuất hiện tăng dần
-    const sortedUpBefore = [...upBefore].sort((a, b) => 
+  // Ưu tiên người chưa lên bill
+  notUpYet = shuffleArray([...new Map(notUpYet.map(item => [item.userId, item])).values()]);
+  upBefore = shuffleArray([...new Map(upBefore.map(item => [item.userId, item])).values()]);
+  
+  // Thêm người chưa lên bill
+  upBill = [...notUpYet.slice(0, Math.min(3, notUpYet.length))];
+  
+  // Nếu chưa đủ 3 người, thêm từ những người đã lên bill
+  if (upBill.length < 3) {
+    // Sắp xếp theo số lần xuất hiện tăng dần
+    const sortedUpBefore = upBefore.sort((a, b) => 
       userFrequency.get(a.userId) - userFrequency.get(b.userId)
     );
     
-    // 3. Bổ sung thêm người cho đủ 3 người
-    const remainingNeeded = 3 - upBill.length;
-    const additionalMembers = shuffleArray(sortedUpBefore)
+    // Lấy thêm người cho đủ 3
+    const remaining = 3 - upBill.length;
+    const additionalMembers = sortedUpBefore
       .filter(m => !upBill.some(u => u.userId === m.userId))
-      .slice(0, remainingNeeded);
+      .slice(0, remaining);
     
     upBill = [...upBill, ...additionalMembers];
   }
 
-  // Đảm bảo 3 người lên bill là khác nhau
-  upBill = Array.from(new Map(upBill.map(item => [item.userId, item])).values());
-  
-  // Xử lý những người còn lại cho chúc bill
-  const remaining = allMembers.filter(m => 
-    !upBill.some(u => u.userId === m.userId)
+  // Tạo mảng các số còn lại cho chúc bill
+  const remainingNumbers = allMembers.filter(m => 
+    !upBill.some(u => u.number === m.number)
   );
-  
-  // Chia nhóm chúc bill
+
+  // Chia chúc bill thành 3 nhóm, mỗi nhóm 4 số
   const chucBillGroups = [];
-  let currentGroup = [];
-  
-  for (const member of shuffleArray(remaining)) {
-    if (currentGroup.length >= 4) {
-      chucBillGroups.push(currentGroup);
-      currentGroup = [];
-    }
-    currentGroup.push(member);
-  }
-  
-  if (currentGroup.length > 0) {
-    chucBillGroups.push(currentGroup);
+  let shuffledRemaining = shuffleArray([...remainingNumbers]);
+
+  // Đảm bảo đủ số lượng cho 3 nhóm chúc bill
+  while (shuffledRemaining.length < 12) {
+    shuffledRemaining = [...shuffledRemaining, ...shuffleArray([...remainingNumbers])];
   }
 
-  return { 
-    upBill, 
-    chucBillGroups: chucBillGroups.slice(0, 3) 
+  // Chia thành 3 nhóm, mỗi nhóm 4 số
+  for (let i = 0; i < 3; i++) {
+    const group = shuffledRemaining.slice(i * 4, (i + 1) * 4);
+    if (group.length === 4) {
+      chucBillGroups.push(group);
+    }
+  }
+
+  // Sắp xếp số thứ tự trong mỗi nhóm chúc bill
+  chucBillGroups.forEach(group => {
+    group.sort((a, b) => a.number - b.number);
+  });
+
+  return {
+    upBill: upBill.map(member => ({
+      ...member,
+      name: member.name,
+      userId: member.userId,
+      number: allMembers.find(m => m.userId === member.userId).number
+    })),
+    chucBillGroups
   };
 }
 
