@@ -2097,7 +2097,7 @@ const billHistorySchema = new mongoose.Schema({
 const BillHistory = mongoose.model('BillHistory', billHistorySchema);
 
 const timeSlots = [
-  { time: '10:45', label: 'ca 10h00' },
+  { time: '10:56', label: 'ca 10h00' },
   { time: '11:30', label: 'ca 12h00' },
   { time: '14:30', label: 'ca 15h00' }, 
   { time: '18:00', label: 'ca 18h30' },
@@ -2304,7 +2304,8 @@ timeSlots.forEach((slot, index) => {
 
 async function allocateNumbers(attendance, todayHistory) {
   const membersByUser = new Map();
-  
+
+  // Organize attendance data by userId
   attendance.memberData.forEach((numbers, name) => {
     numbers.forEach(item => {
       if (!membersByUser.has(item.userId)) {
@@ -2318,17 +2319,22 @@ async function allocateNumbers(attendance, todayHistory) {
     });
   });
 
+  // Get all members sorted by random score for fair distribution
   const allMembers = Array.from(membersByUser.values()).map(member => ({
     ...member,
     randomScore: Math.random()
   }));
 
+  // Extract members who have already received bills today
   const todayBillMembers = new Set(
     todayHistory.flatMap(h => h.members.map(m => m.userId))
   );
 
+  // Filter out members who haven't been assigned a bill yet
   const notUpYet = allMembers.filter(m => !todayBillMembers.has(m.userId))
     .sort((a, b) => b.randomScore - a.randomScore);
+
+  // Filter members who already received a bill today
   const upBefore = allMembers.filter(m => todayBillMembers.has(m.userId))
     .sort((a, b) => b.randomScore - a.randomScore);
 
@@ -2348,6 +2354,7 @@ async function allocateNumbers(attendance, todayHistory) {
     number: member.numbers[0]
   }));
 
+  // Collect the remaining numbers from members who didn't get assigned to upBill
   const remainingNumbers = [];
   attendance.memberData.forEach((numbers, name) => {
     numbers.forEach(item => {
@@ -2361,10 +2368,12 @@ async function allocateNumbers(attendance, todayHistory) {
     });
   });
 
+  // Shuffle the remaining members
   const shuffledRemaining = shuffleArray(remainingNumbers);
   const chucBillGroups = [];
   let currentGroup = [];
 
+  // Create groups with exactly 4 members
   for (const member of shuffledRemaining) {
     if (currentGroup.length >= 4) {
       chucBillGroups.push(currentGroup);
@@ -2373,16 +2382,21 @@ async function allocateNumbers(attendance, todayHistory) {
     currentGroup.push(member);
   }
 
+  // Add the last group if it's not empty
   if (currentGroup.length > 0) {
     chucBillGroups.push(currentGroup);
   }
 
+  // Ensure there are exactly 3 groups by trimming if necessary
+  const limitedChucBillGroups = chucBillGroups.slice(0, 3);
+
   return {
     upBill,
-    chucBillGroups: chucBillGroups.slice(0, 3)
+    chucBillGroups: limitedChucBillGroups
   };
 }
 
+// Shuffle function to randomize array order
 function shuffleArray(array) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -2390,6 +2404,7 @@ function shuffleArray(array) {
   }
   return array;
 }
+
 
 
 
