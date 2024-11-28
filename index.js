@@ -2097,7 +2097,7 @@ const billHistorySchema = new mongoose.Schema({
 const BillHistory = mongoose.model('BillHistory', billHistorySchema);
 
 const timeSlots = [
-  { time: '10:56', label: 'ca 10h00' },
+  { time: '11:22', label: 'ca 10h00' },
   { time: '11:30', label: 'ca 12h00' },
   { time: '14:30', label: 'ca 15h00' }, 
   { time: '18:00', label: 'ca 18h30' },
