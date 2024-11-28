@@ -1992,38 +1992,47 @@ bot.onText(/Trừ/, async (msg) => {
 
   // Lấy thông tin từ tin nhắn bot mà người dùng trả lời
   const chatId = msg.chat.id;
-  const userId = msg.from.id;
-  const username = msg.from.username;
-
   const replyText = msg.reply_to_message.text;
-  const matched = replyText.match(/Bài nộp của (.+) đã được ghi nhận với (\d+) quẩy, (\d+) cộng, (\d+) bill, (\d+) ảnh vào (.*) đang chờ kiểm tra ❤🥳\. Tổng tiền: \+?([\d,]+) VNĐ/);
-  
-  if (!matched) {
+
+  // Kiểm tra và bắt các giá trị cần thiết từ nội dung tin nhắn
+  const tenMatch = replyText.match(/Bài nộp của (.+?) đã được ghi nhận/);
+  const quayMatch = replyText.match(/(\d+)\s+quẩy/);
+  const keoMatch = replyText.match(/(\d+)\s+cộng/);
+  const billMatch = replyText.match(/(\d+)\s+bill/);
+  const anhMatch = replyText.match(/(\d+)\s+ảnh/);
+  const submissionDateMatch = replyText.match(/vào (.+?) đang chờ kiểm tra/);
+  const totalMoneyMatch = replyText.match(/Tổng tiền: \+?([\d,]+) VNĐ/);
+
+  if (!tenMatch || !quayMatch || !keoMatch || !billMatch || !anhMatch || !submissionDateMatch || !totalMoneyMatch) {
     bot.sendMessage(chatId, 'Tin nhắn trả lời không đúng định dạng xác nhận của bot.');
     return;
   }
 
   // Lấy thông tin từ tin nhắn trả lời
-  const ten = matched[1].trim();
-  const quay = parseInt(matched[2]);
-  const keo = parseInt(matched[3]);
-  const bill = parseInt(matched[4]);
-  const anh = parseInt(matched[5]);
-  const submissionDateStr = matched[6];
-  const totalMoney = parseInt(matched[7].replace(/,/g, ''));
+  const ten = tenMatch[1].trim();
+  const quay = parseInt(quayMatch[1]);
+  const keo = parseInt(keoMatch[1]);
+  const bill = parseInt(billMatch[1]);
+  const anh = parseInt(anhMatch[1]);
+  const submissionDateStr = submissionDateMatch[1].trim();
+  const totalMoney = parseInt(totalMoneyMatch[1].replace(/,/g, ''));
 
-  // Parse ngày giờ kiểu Mỹ (MM/DD/YYYY HH:mm AM/PM)
-  const submissionDate = new Date(submissionDateStr); 
-
-  // Lấy ngày từ tin nhắn của bot (msg.reply_to_message.date)
-  const messageDate = new Date(msg.reply_to_message.date * 1000);
-  const normalizedMessageDate = new Date(messageDate.setHours(0, 0, 0, 0)); // Ngày không giờ phút giây
+  // Tạo bản ghi bài nộp để kiểm tra log
+  const submissionRecord = {
+    ten: normalizeName(ten),
+    quay,
+    keo,
+    bill,
+    anh,
+    totalMoney,
+    submissionDate: new Date(submissionDateStr).getTime()
+  };
 
   try {
     // Tìm kiếm bản ghi thành viên dựa trên tên và ngày gửi tin nhắn của bot
     const regex = new RegExp(normalizeName(ten).split('').join('.*'), 'i');
-    
-    // Đảm bảo rằng truy vấn sẽ sử dụng ngày cụ thể, không phải khoảng thời gian
+    const normalizedMessageDate = new Date(new Date(msg.reply_to_message.date * 1000).setHours(0, 0, 0, 0));
+
     const bangCong = await BangCong2.findOne({
       groupId: chatId,
       ten: { $regex: regex },
@@ -2035,9 +2044,16 @@ bot.onText(/Trừ/, async (msg) => {
       return;
     }
 
-    // Kiểm tra xem bài nộp này đã được trừ trước đó chưa
-    const submissionTime = submissionDate.getTime();
-    if (bangCong.da_tru === true && bangCong.date.getTime() === normalizedMessageDate.getTime() && bangCong.submissionTime === submissionTime) {
+    // Kiểm tra nếu bài nộp đã được trừ trước đó
+    if (bangCong.log_da_tru && bangCong.log_da_tru.some((log) => 
+      log.ten === submissionRecord.ten &&
+      log.quay === submissionRecord.quay &&
+      log.keo === submissionRecord.keo &&
+      log.bill === submissionRecord.bill &&
+      log.anh === submissionRecord.anh &&
+      log.totalMoney === submissionRecord.totalMoney &&
+      log.submissionDate === submissionRecord.submissionDate
+    )) {
       bot.sendMessage(chatId, 'Trừ không thành công, bài nộp này đã trừ trước đó rồi.');
       return;
     }
@@ -2045,13 +2061,15 @@ bot.onText(/Trừ/, async (msg) => {
     // Cập nhật số liệu dựa trên thông tin đã lấy
     bangCong.quay -= quay;
     bangCong.keo -= keo;
-    bangCong.bill -= bill; 
+    bangCong.bill -= bill;
     bangCong.anh -= anh;
     bangCong.tinh_tien -= totalMoney;
 
-    // Đánh dấu bài nộp này đã được trừ
-    bangCong.da_tru = true;
-    bangCong.submissionTime = submissionTime;
+    // Thêm log bài nộp đã trừ
+    if (!bangCong.log_da_tru) {
+      bangCong.log_da_tru = [];
+    }
+    bangCong.log_da_tru.push(submissionRecord);
 
     // Lưu lại bản ghi đã chỉnh sửa
     await bangCong.save();
@@ -2062,6 +2080,7 @@ bot.onText(/Trừ/, async (msg) => {
     bot.sendMessage(chatId, 'Đã xảy ra lỗi khi cập nhật dữ liệu.');
   }
 });
+
 
 
 
