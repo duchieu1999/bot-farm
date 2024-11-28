@@ -1980,27 +1980,6 @@ bot.onText(/\/edit (.+)/, async (msg, match) => {
 
 
 
-const normalizeName = (name) => {
-  return name.replace(/[^\w\s]/gi, '').toLowerCase().trim();
-};
-
-// Tạo Schema mới để lưu thông tin bài nộp đã xử lý
-const ProcessedSubmissionSchema = new mongoose.Schema({
-  groupId: { type: String, required: true },
-  userId: { type: String, required: true },
-  ten: { type: String, required: true },
-  submissionTime: { type: Date, required: true },
-  date: { type: Date, required: true },
-  quay: { type: Number, required: true },
-  keo: { type: Number, required: true },
-  bill: { type: Number, required: true },
-  anh: { type: Number, required: true },
-  totalMoney: { type: Number, required: true },
-  processedAt: { type: Date, default: Date.now }
-});
-
-const ProcessedSubmission = mongoose.model('ProcessedSubmission', ProcessedSubmissionSchema);
-
 
 
 
@@ -2192,7 +2171,6 @@ const attendanceSchema = new mongoose.Schema({
 
 const Attendance = mongoose.model('Attendance', attendanceSchema);
 
-// Schema for tracking members who went up for bills
 const billHistorySchema = new mongoose.Schema({
   date: { type: Date, default: Date.now },
   ca: String,
@@ -2205,14 +2183,14 @@ const billHistorySchema = new mongoose.Schema({
 const BillHistory = mongoose.model('BillHistory', billHistorySchema);
 
 const timeSlots = [
-  { time: '9:30', label: 'ca 10h00' },
+  { time: '8:56', label: 'ca 10h00' },
   { time: '11:30', label: 'ca 12h00' },
   { time: '14:30', label: 'ca 15h00' }, 
   { time: '18:00', label: 'ca 18h30' },
   { time: '19:30', label: 'ca 20h00' }
 ];
 
-const groupId = -1002280909865;
+const groupId = -1002333438294;
 const adminIds = [7305842707];
 const topicId = 10;
 
@@ -2226,7 +2204,7 @@ let currentCa = '';
 schedule.scheduleJob('0 0 * * *', async () => {
   try {
     await Attendance.deleteMany({});
-    await BillHistory.deleteMany({ date: { $lt: new Date() } }); // Delete previous day's history
+    await BillHistory.deleteMany({ date: { $lt: new Date() } });
     billImagesCount = 0;
     billImages = [];
     upBillMembers = [];
@@ -2257,7 +2235,6 @@ timeSlots.forEach((slot, index) => {
     const messageHandler = async (msg) => {
       if (msg.chat.id !== groupId) return;
 
-      // Check if user is an admin or has admin privileges
       try {
         const chatMember = await bot.getChatMember(groupId, msg.from.id);
         const isAdmin = adminIds.includes(msg.from.id) || 
@@ -2278,7 +2255,7 @@ timeSlots.forEach((slot, index) => {
                 await bot.sendPhoto(groupId, billImages[i].photoId, {
                   caption: `Bill ${label} của [${member.name}](tg://user?id=${member.userId}) - STT: ${member.number}\n`,
                   parse_mode: 'Markdown',
-                  message_thread_id: topicId // Gửi vào thread cụ thể
+                  message_thread_id: topicId
                 });
               } catch (error) {
                 console.error('Lỗi gửi ảnh:', error);
@@ -2295,7 +2272,6 @@ timeSlots.forEach((slot, index) => {
         let text = msg.text;
         let targetUserId;
 
-        // Handle admin replies
         if (isAdmin && msg.reply_to_message) {
           targetUserId = msg.reply_to_message.from.id;
           const numberMatch = text.match(/\d+/g);
@@ -2312,13 +2288,8 @@ timeSlots.forEach((slot, index) => {
         const numbers = text.split(/[.,\s]+/).map(Number);
         
         const currentAttendance = await Attendance.findOne({ ca: currentCa });
-        if (!currentAttendance) return;
+        if (!currentAttendance || currentAttendance.isLocked) return;
 
-        if (currentAttendance.isLocked) {
-  return;
-}
-
-        // Check for duplicate numbers from other members
         const existingMembers = Array.from(currentAttendance.memberData.entries());
         const existingNumbers = new Set();
         
@@ -2343,11 +2314,8 @@ timeSlots.forEach((slot, index) => {
           }
         }
 
-         // Handle numbers for the current member
         const existingData = currentAttendance.memberData.get(memberName) || [];
         const existingNumbersSet = new Set(existingData.map(item => item.number));
-        
-        // Filter out numbers that this member already has
         const newUniqueNumbers = numbers.filter(num => !existingNumbersSet.has(num));
         
         if (newUniqueNumbers.length > 0) {
@@ -2362,17 +2330,15 @@ timeSlots.forEach((slot, index) => {
           await currentAttendance.save();
         }
 
-
         const allNumbers = Array.from(currentAttendance.memberData.values())
           .flat()
           .map(item => item.number);
 
-       if (allNumbers.length >= 15 && !currentAttendance.isLocked) {
-       currentAttendance.isLocked = true; // Khóa bảng công
-       await currentAttendance.save();
+        if (allNumbers.length >= 15 && !currentAttendance.isLocked) {
+          currentAttendance.isLocked = true;
+          await currentAttendance.save();
           bot.sendMessage(groupId, `✅ Chốt điểm danh ${label}!`);
 
-          // Get today's bill history
           const today = new Date();
           today.setHours(0, 0, 0, 0);
           const todayHistory = await BillHistory.find({
@@ -2381,7 +2347,6 @@ timeSlots.forEach((slot, index) => {
 
           const { upBill, chucBillGroups } = await allocateNumbers(currentAttendance, todayHistory);
           
-          // Save new bill history
           const newBillHistory = new BillHistory({
             ca: currentCa,
             members: upBill.map(m => ({
@@ -2435,31 +2400,32 @@ async function allocateNumbers(attendance, todayHistory) {
     });
   });
 
-  // Get all members who went up for bills today
+  // Lấy danh sách những người đã lên bill hôm nay
   const todayBillMembers = new Set(
     todayHistory.flatMap(h => h.members.map(m => m.userId))
   );
 
-  // Separate members who haven't gone up for bills today
+  // Lọc ra những người chưa lên bill
   const notUpYet = allMembers.filter(m => !todayBillMembers.has(m.userId));
-  const upBefore = allMembers.filter(m => todayBillMembers.has(m.userId));
-
+  
   let upBill;
-  if (notUpYet.length >= 3) {
-    // If we have enough new members, use them
-    upBill = shuffleArray(notUpYet).slice(0, 3);
+  if (notUpYet.length >= 2) {
+    // Nếu có đủ người chưa lên bill, chọn ngẫu nhiên 2-3 người từ danh sách này
+    const numToSelect = Math.floor(Math.random() * 2) + 2; // Random 2-3 người
+    upBill = shuffleArray(notUpYet).slice(0, numToSelect);
   } else {
-    // If not enough new members, combine with members who went up before
-    const newMembers = shuffleArray(notUpYet);
-    const fillMembers = shuffleArray(upBefore).slice(0, 3 - notUpYet.length);
-    upBill = [...newMembers, ...fillMembers];
+    // Nếu không đủ người chưa lên bill, thì bổ sung thêm từ những người đã lên bill
+    const upBefore = allMembers.filter(m => todayBillMembers.has(m.userId));
+    const numNeeded = Math.floor(Math.random() * 2) + 2 - notUpYet.length;
+    const fillMembers = shuffleArray(upBefore).slice(0, numNeeded);
+    upBill = [...notUpYet, ...fillMembers];
   }
 
+  // Xử lý phần còn lại cho chúc bill
   const remaining = allMembers.filter(m => 
     !upBill.some(u => u.userId === m.userId)
   );
   
-  // Divide remaining members into chuc bill groups
   const chucBillGroups = [];
   let currentGroup = [];
   
