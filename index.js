@@ -2070,6 +2070,8 @@ bot.onText(/Trừ/, async (msg) => {
 
 
 
+
+
 const attendanceSchema = new mongoose.Schema({
   ca: String,
   memberData: {
@@ -2097,14 +2099,14 @@ const billHistorySchema = new mongoose.Schema({
 const BillHistory = mongoose.model('BillHistory', billHistorySchema);
 
 const timeSlots = [
-  { time: '11:22', label: 'ca 10h00' },
-  { time: '11:30', label: 'ca 12h00' },
+  { time: '9:30', label: 'ca 10h00' },
+  { time: '11:32', label: 'ca 12h00' },
   { time: '14:30', label: 'ca 15h00' }, 
   { time: '18:00', label: 'ca 18h30' },
   { time: '19:30', label: 'ca 20h00' }
 ];
 
-const groupId = -1002333438294;
+const groupId = -1002280909865;
 const adminIds = [7305842707];
 const topicId = 10;
 
@@ -2280,9 +2282,7 @@ timeSlots.forEach((slot, index) => {
 
           response += '\n*🔸 Chúc Bill:*\n';
           chucBillGroups.forEach((group, idx) => {
-            if (group.length <= 4) {
-              response += `   • Bill ${idx + 1}: ${group.map(m => `${m.number}`).join(', ')}\n`;
-            }
+            response += `   • Bill ${idx + 1}: ${group.map(m => m.number).join(', ')}\n`;
           });
 
           bot.sendMessage(groupId, response, {
@@ -2304,8 +2304,7 @@ timeSlots.forEach((slot, index) => {
 
 async function allocateNumbers(attendance, todayHistory) {
   const membersByUser = new Map();
-
-  // Organize attendance data by userId
+  
   attendance.memberData.forEach((numbers, name) => {
     numbers.forEach(item => {
       if (!membersByUser.has(item.userId)) {
@@ -2319,22 +2318,17 @@ async function allocateNumbers(attendance, todayHistory) {
     });
   });
 
-  // Get all members sorted by random score for fair distribution
   const allMembers = Array.from(membersByUser.values()).map(member => ({
     ...member,
     randomScore: Math.random()
   }));
 
-  // Extract members who have already received bills today
   const todayBillMembers = new Set(
     todayHistory.flatMap(h => h.members.map(m => m.userId))
   );
 
-  // Filter out members who haven't been assigned a bill yet
   const notUpYet = allMembers.filter(m => !todayBillMembers.has(m.userId))
     .sort((a, b) => b.randomScore - a.randomScore);
-
-  // Filter members who already received a bill today
   const upBefore = allMembers.filter(m => todayBillMembers.has(m.userId))
     .sort((a, b) => b.randomScore - a.randomScore);
 
@@ -2354,45 +2348,50 @@ async function allocateNumbers(attendance, todayHistory) {
     number: member.numbers[0]
   }));
 
-  // Collect the remaining numbers from members who didn't get assigned to upBill
-   // Sort remaining numbers in ascending order
-  remainingNumbers.sort((a, b) => a.number - b.number);
+  // Thay thế đoạn code cũ từ phần xử lý remainingNumbers bằng đoạn code sau:
 
-  // Create exactly 3 groups with 4 numbers each
+  const remainingNumbers = [];
+  attendance.memberData.forEach((numbers, name) => {
+    numbers.forEach(item => {
+      if (!upBill.some(u => u.userId === item.userId)) {
+        remainingNumbers.push({
+          name: name,
+          number: item.number,
+          userId: item.userId
+        });
+      }
+    });
+  });
+
+  // Tạo chính xác 3 nhóm
   const chucBillGroups = [[], [], []];
   
-  // Fill each group with 4 numbers
-  for (let i = 0; i < Math.min(remainingNumbers.length, 12); i++) {
-    const groupIndex = Math.floor(i / 4);
-    chucBillGroups[groupIndex].push(remainingNumbers[i]);
+  // Xáo trộn ngẫu nhiên các số còn lại
+  const shuffledNumbers = shuffleArray([...remainingNumbers]);
+  
+  // Đảm bảo đủ 12 phần tử bằng cách lặp lại nếu thiếu
+  while (shuffledNumbers.length < 12) {
+    shuffledNumbers.push(...shuffleArray([...remainingNumbers]));
   }
 
-  // If any group has less than 4 numbers, fill with the first numbers again
-  for (let i = 0; i < 3; i++) {
-    while (chucBillGroups[i].length < 4) {
-      const numberToAdd = remainingNumbers[i % remainingNumbers.length];
-      chucBillGroups[i].push({
-        ...numberToAdd,
-        number: numberToAdd.number // Use the same number if we need to reuse
-      });
-    }
+  // Chia đều 12 số đầu tiên vào 3 nhóm
+  for (let i = 0; i < 12; i++) {
+    const groupIndex = Math.floor(i / 4);
+    chucBillGroups[groupIndex].push(shuffledNumbers[i]);
   }
 
   return {
     upBill,
     chucBillGroups
   };
-}
 
-// Shuffle function to randomize array order
-function shuffleArray(array) {
+  function shuffleArray(array) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [array[i], array[j]] = [array[j], array[i]];
   }
   return array;
 }
-
 
 
 
