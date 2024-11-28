@@ -2001,9 +2001,33 @@ const ProcessedSubmissionSchema = new mongoose.Schema({
 
 const ProcessedSubmission = mongoose.model('ProcessedSubmission', ProcessedSubmissionSchema);
 
+
+
+
+
+
+
 const normalizeName = (name) => {
   return name.replace(/[^\w\s]/gi, '').toLowerCase().trim();
 };
+
+// Thêm schema cho submission
+const submissionSchema = new mongoose.Schema({
+  groupId: { type: Number, required: true },
+  userId: String,
+  ten: String,
+  quay: Number,
+  keo: Number,
+  bill: Number,
+  anh: Number,
+  tien: Number,
+  submissionTime: Date,
+  messageId: { type: String, required: true },
+  isDaTru: { type: Boolean, default: false },
+  date: Date
+});
+
+const Submission = mongoose.model('Submission', submissionSchema);
 
 bot.onText(/Trừ/, async (msg) => {
   if (!msg.reply_to_message || !msg.reply_to_message.text) {
@@ -2013,6 +2037,8 @@ bot.onText(/Trừ/, async (msg) => {
 
   const chatId = msg.chat.id;
   const userId = msg.from.id;
+  const username = msg.from.username;
+  const messageId = msg.reply_to_message.message_id.toString();
   const replyText = msg.reply_to_message.text;
 
   // Kiểm tra và bắt các giá trị từ nội dung tin nhắn
@@ -2034,26 +2060,28 @@ bot.onText(/Trừ/, async (msg) => {
   const keo = parseInt(keoMatch[1]);
   const bill = parseInt(billMatch[1]);
   const anh = parseInt(anhMatch[1]);
-  const submissionDate = new Date(submissionDateMatch[1].trim());
+  const submissionDateStr = submissionDateMatch[1].trim();
   const totalMoney = parseInt(totalMoneyMatch[1].replace(/,/g, ''));
+
+  const submissionDate = new Date(submissionDateStr);
   const messageDate = new Date(msg.reply_to_message.date * 1000);
   const normalizedMessageDate = new Date(messageDate.setHours(0, 0, 0, 0));
 
   try {
-    // Kiểm tra xem bài nộp đã được xử lý chưa
-    const existingProcessed = await ProcessedSubmission.findOne({
+    // Kiểm tra submission dựa trên messageId và groupId
+    const existingSubmission = await Submission.findOne({
       groupId: chatId,
-      ten: normalizeName(ten),
-      submissionTime: submissionDate,
-      date: normalizedMessageDate
+      messageId: messageId
     });
 
-    if (existingProcessed) {
-      bot.sendMessage(chatId, 'Trừ không thành công, bài nộp này đã được xử lý trước đó.');
-      return;
+    if (existingSubmission) {
+      if (existingSubmission.isDaTru) {
+        bot.sendMessage(chatId, 'Bài nộp này đã được trừ trước đó.');
+        return;
+      }
     }
 
-    // Tìm bản ghi cần cập nhật
+    // Tìm bản ghi BangCong2
     const regex = new RegExp(normalizeName(ten).split('').join('.*'), 'i');
     const bangCong = await BangCong2.findOne({
       groupId: chatId,
@@ -2062,45 +2090,87 @@ bot.onText(/Trừ/, async (msg) => {
     });
 
     if (!bangCong) {
-      bot.sendMessage(chatId, `Không tìm thấy bản ghi để cập nhật cho ${ten}.`);
+      bot.sendMessage(chatId, `Không tìm thấy bản ghi để cập nhật cho ${ten.trim()}.`);
       return;
     }
 
-    // Cập nhật số liệu
+    // Nếu chưa có submission, tạo mới
+    if (!existingSubmission) {
+      const newSubmission = new Submission({
+        groupId: chatId,
+        userId: userId,
+        ten: ten,
+        quay: quay,
+        keo: keo,
+        bill: bill,
+        anh: anh,
+        tien: totalMoney,
+        submissionTime: submissionDate,
+        messageId: messageId,
+        isDaTru: true,
+        date: normalizedMessageDate
+      });
+      await newSubmission.save();
+    } else {
+      existingSubmission.isDaTru = true;
+      await existingSubmission.save();
+    }
+
+    // Cập nhật BangCong2
     bangCong.quay -= quay;
     bangCong.keo -= keo;
     bangCong.bill -= bill;
     bangCong.anh -= anh;
     bangCong.tinh_tien -= totalMoney;
+    await bangCong.save();
 
-    // Lưu thông tin bài nộp đã xử lý
-    const processedSubmission = new ProcessedSubmission({
-      groupId: chatId,
-      userId: userId,
-      ten: normalizeName(ten),
-      submissionTime: submissionDate,
-      date: normalizedMessageDate,
-      quay,
-      keo,
-      bill,
-      anh,
-      totalMoney
-    });
+    const response = `Trừ thành công bài nộp cho ${ten.trim()}:\n` +
+      `- Quẩy: -${quay}\n` +
+      `- Kẹo: -${keo}\n` +
+      `- Bill: -${bill}\n` +
+      `- Ảnh: -${anh}\n` +
+      `- Tổng tiền: -${totalMoney.toLocaleString('vi-VN')} VNĐ`;
 
-    // Lưu cả hai thay đổi trong một transaction
-    const session = await mongoose.startSession();
-    await session.withTransaction(async () => {
-      await bangCong.save({ session });
-      await processedSubmission.save({ session });
-    });
-    session.endSession();
+    bot.sendMessage(chatId, response);
 
-    bot.sendMessage(chatId, `Trừ thành công bài nộp này cho ${ten}.`);
   } catch (error) {
     console.error('Lỗi khi cập nhật dữ liệu:', error);
     bot.sendMessage(chatId, 'Đã xảy ra lỗi khi cập nhật dữ liệu.');
   }
 });
+
+// Hàm tạo submission mới (gọi khi bot ghi nhận bài nộp)
+const createSubmission = async (data) => {
+  const {
+    groupId,
+    userId,
+    ten,
+    quay,
+    keo,
+    bill,
+    anh,
+    tien,
+    submissionTime,
+    messageId
+  } = data;
+
+  const submission = new Submission({
+    groupId,
+    userId,
+    ten,
+    quay,
+    keo,
+    bill,
+    anh,
+    tien,
+    submissionTime,
+    messageId,
+    isDaTru: false,
+    date: new Date(submissionTime.setHours(0, 0, 0, 0))
+  });
+
+  return submission.save();
+};
 
 
 
