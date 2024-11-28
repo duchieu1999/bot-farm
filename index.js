@@ -2355,44 +2355,32 @@ async function allocateNumbers(attendance, todayHistory) {
   }));
 
   // Collect the remaining numbers from members who didn't get assigned to upBill
-  const remainingNumbers = [];
-  attendance.memberData.forEach((numbers, name) => {
-    numbers.forEach(item => {
-      if (!upBill.some(u => u.userId === item.userId)) {
-        remainingNumbers.push({
-          name: name,
-          number: item.number,
-          userId: item.userId
-        });
-      }
-    });
-  });
+   // Sort remaining numbers in ascending order
+  remainingNumbers.sort((a, b) => a.number - b.number);
 
-  // Shuffle the remaining members
-  const shuffledRemaining = shuffleArray(remainingNumbers);
-  const chucBillGroups = [];
-  let currentGroup = [];
+  // Create exactly 3 groups with 4 numbers each
+  const chucBillGroups = [[], [], []];
+  
+  // Fill each group with 4 numbers
+  for (let i = 0; i < Math.min(remainingNumbers.length, 12); i++) {
+    const groupIndex = Math.floor(i / 4);
+    chucBillGroups[groupIndex].push(remainingNumbers[i]);
+  }
 
-  // Create groups with exactly 4 members
-  for (const member of shuffledRemaining) {
-    if (currentGroup.length >= 4) {
-      chucBillGroups.push(currentGroup);
-      currentGroup = [];
+  // If any group has less than 4 numbers, fill with the first numbers again
+  for (let i = 0; i < 3; i++) {
+    while (chucBillGroups[i].length < 4) {
+      const numberToAdd = remainingNumbers[i % remainingNumbers.length];
+      chucBillGroups[i].push({
+        ...numberToAdd,
+        number: numberToAdd.number // Use the same number if we need to reuse
+      });
     }
-    currentGroup.push(member);
   }
-
-  // Add the last group if it's not empty
-  if (currentGroup.length > 0) {
-    chucBillGroups.push(currentGroup);
-  }
-
-  // Ensure there are exactly 3 groups by trimming if necessary
-  const limitedChucBillGroups = chucBillGroups.slice(0, 3);
 
   return {
     upBill,
-    chucBillGroups: limitedChucBillGroups
+    chucBillGroups
   };
 }
 
