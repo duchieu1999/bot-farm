@@ -34,7 +34,7 @@ const BangCongSchema = new mongoose.Schema({
   da_tru: { type: Boolean, default: false },
   giftWon: { type: Boolean, default: false },
   prizeAmount: { type: Number, default: 0 },
-  message_id: { type: Number, unique: true },
+  message_ids: { type: [Number], default: [] },
   nhan_anh_bill: { type: Number, default: 0 } // Ensure default is 0
 });
 
@@ -1987,10 +1987,6 @@ bot.onText(/\/edit (.+)/, async (msg, match) => {
 
 
 
-const normalizeName = (name) => {
-  return name.replace(/[^\w\s]/gi, '').toLowerCase().trim();
-};
-
 bot.onText(/Trừ/, async (msg) => {
   if (!msg.reply_to_message || !msg.reply_to_message.text) {
     bot.sendMessage(msg.chat.id, 'Hãy trả lời vào đúng tin nhắn xác nhận của bot để cập nhật.');
@@ -2001,7 +1997,6 @@ bot.onText(/Trừ/, async (msg) => {
   const replyText = msg.reply_to_message.text;
   const replyMessageId = msg.reply_to_message.message_id;
 
-  // Kiểm tra và bắt các giá trị cần thiết từ nội dung tin nhắn
   const tenMatch = replyText.match(/Bài nộp của (.+?) đã được ghi nhận/);
   const quayMatch = replyText.match(/(\d+)\s+quẩy/);
   const keoMatch = replyText.match(/(\d+)\s+cộng/);
@@ -2022,10 +2017,10 @@ bot.onText(/Trừ/, async (msg) => {
   const totalMoney = parseInt(totalMoneyMatch[1].replace(/,/g, ''));
 
   try {
-    // Tìm kiếm bài nộp dựa trên message_id
+    // Kiểm tra xem message_id đã tồn tại trong bản ghi nào chưa
     const bangCong = await BangCong2.findOne({
       groupId: chatId,
-      message_id: replyMessageId, // Kiểm tra message_id
+      message_ids: replyMessageId, // Tìm message_id trong mảng
     });
 
     if (bangCong) {
@@ -2033,7 +2028,7 @@ bot.onText(/Trừ/, async (msg) => {
       return;
     }
 
-    // Nếu chưa trừ, tạo mới hoặc cập nhật bản ghi
+    // Nếu chưa xử lý, cập nhật bản ghi
     const regex = new RegExp(normalizeName(ten).split('').join('.*'), 'i');
     const bangCongUpdate = await BangCong2.findOneAndUpdate(
       {
@@ -2043,7 +2038,7 @@ bot.onText(/Trừ/, async (msg) => {
       },
       {
         $inc: { quay: -quay, keo: -keo, bill: -bill, anh: -anh, tinh_tien: -totalMoney },
-        $set: { message_id: replyMessageId },
+        $addToSet: { message_ids: replyMessageId }, // Thêm message_id vào mảng
       },
       { new: true, upsert: true }
     );
@@ -2054,6 +2049,7 @@ bot.onText(/Trừ/, async (msg) => {
     bot.sendMessage(chatId, 'Đã xảy ra lỗi khi cập nhật dữ liệu.');
   }
 });
+
 
 
 
@@ -2088,7 +2084,7 @@ const billHistorySchema = new mongoose.Schema({
 const BillHistory = mongoose.model('BillHistory', billHistorySchema);
 
 const timeSlots = [
-  { time: '10:04', label: 'ca 10h00' },
+  { time: '10:32', label: 'ca 10h00' },
   { time: '11:30', label: 'ca 12h00' },
   { time: '14:30', label: 'ca 15h00' }, 
   { time: '18:00', label: 'ca 18h30' },
