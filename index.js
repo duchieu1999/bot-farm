@@ -1984,17 +1984,38 @@ const normalizeName = (name) => {
   return name.replace(/[^\w\s]/gi, '').toLowerCase().trim();
 };
 
+// Tạo Schema mới để lưu thông tin bài nộp đã xử lý
+const ProcessedSubmissionSchema = new mongoose.Schema({
+  groupId: { type: String, required: true },
+  userId: { type: String, required: true },
+  ten: { type: String, required: true },
+  submissionTime: { type: Date, required: true },
+  date: { type: Date, required: true },
+  quay: { type: Number, required: true },
+  keo: { type: Number, required: true },
+  bill: { type: Number, required: true },
+  anh: { type: Number, required: true },
+  totalMoney: { type: Number, required: true },
+  processedAt: { type: Date, default: Date.now }
+});
+
+const ProcessedSubmission = mongoose.model('ProcessedSubmission', ProcessedSubmissionSchema);
+
+const normalizeName = (name) => {
+  return name.replace(/[^\w\s]/gi, '').toLowerCase().trim();
+};
+
 bot.onText(/Trừ/, async (msg) => {
   if (!msg.reply_to_message || !msg.reply_to_message.text) {
     bot.sendMessage(msg.chat.id, 'Hãy trả lời vào đúng tin nhắn xác nhận của bot để cập nhật.');
     return;
   }
 
-  // Lấy thông tin từ tin nhắn bot mà người dùng trả lời
   const chatId = msg.chat.id;
+  const userId = msg.from.id;
   const replyText = msg.reply_to_message.text;
 
-  // Kiểm tra và bắt các giá trị cần thiết từ nội dung tin nhắn
+  // Kiểm tra và bắt các giá trị từ nội dung tin nhắn
   const tenMatch = replyText.match(/Bài nộp của (.+?) đã được ghi nhận/);
   const quayMatch = replyText.match(/(\d+)\s+quẩy/);
   const keoMatch = replyText.match(/(\d+)\s+cộng/);
@@ -2008,31 +2029,32 @@ bot.onText(/Trừ/, async (msg) => {
     return;
   }
 
-  // Lấy thông tin từ tin nhắn trả lời
   const ten = tenMatch[1].trim();
   const quay = parseInt(quayMatch[1]);
   const keo = parseInt(keoMatch[1]);
   const bill = parseInt(billMatch[1]);
   const anh = parseInt(anhMatch[1]);
-  const submissionDateStr = submissionDateMatch[1].trim();
+  const submissionDate = new Date(submissionDateMatch[1].trim());
   const totalMoney = parseInt(totalMoneyMatch[1].replace(/,/g, ''));
-
-  // Tạo bản ghi bài nộp để kiểm tra log
-  const submissionRecord = {
-    ten: normalizeName(ten),
-    quay,
-    keo,
-    bill,
-    anh,
-    totalMoney,
-    submissionDate: new Date(submissionDateStr).getTime()
-  };
+  const messageDate = new Date(msg.reply_to_message.date * 1000);
+  const normalizedMessageDate = new Date(messageDate.setHours(0, 0, 0, 0));
 
   try {
-    // Tìm kiếm bản ghi thành viên dựa trên tên và ngày gửi tin nhắn của bot
-    const regex = new RegExp(normalizeName(ten).split('').join('.*'), 'i');
-    const normalizedMessageDate = new Date(new Date(msg.reply_to_message.date * 1000).setHours(0, 0, 0, 0));
+    // Kiểm tra xem bài nộp đã được xử lý chưa
+    const existingProcessed = await ProcessedSubmission.findOne({
+      groupId: chatId,
+      ten: normalizeName(ten),
+      submissionTime: submissionDate,
+      date: normalizedMessageDate
+    });
 
+    if (existingProcessed) {
+      bot.sendMessage(chatId, 'Trừ không thành công, bài nộp này đã được xử lý trước đó.');
+      return;
+    }
+
+    // Tìm bản ghi cần cập nhật
+    const regex = new RegExp(normalizeName(ten).split('').join('.*'), 'i');
     const bangCong = await BangCong2.findOne({
       groupId: chatId,
       ten: { $regex: regex },
@@ -2040,41 +2062,40 @@ bot.onText(/Trừ/, async (msg) => {
     });
 
     if (!bangCong) {
-      bot.sendMessage(chatId, `Không tìm thấy bản ghi để cập nhật cho ${ten.trim()}.`);
+      bot.sendMessage(chatId, `Không tìm thấy bản ghi để cập nhật cho ${ten}.`);
       return;
     }
 
-    // Kiểm tra nếu bài nộp đã được trừ trước đó
-    if (bangCong.log_da_tru && bangCong.log_da_tru.some((log) => 
-      log.ten === submissionRecord.ten &&
-      log.quay === submissionRecord.quay &&
-      log.keo === submissionRecord.keo &&
-      log.bill === submissionRecord.bill &&
-      log.anh === submissionRecord.anh &&
-      log.totalMoney === submissionRecord.totalMoney &&
-      log.submissionDate === submissionRecord.submissionDate
-    )) {
-      bot.sendMessage(chatId, 'Trừ không thành công, bài nộp này đã trừ trước đó rồi.');
-      return;
-    }
-
-    // Cập nhật số liệu dựa trên thông tin đã lấy
+    // Cập nhật số liệu
     bangCong.quay -= quay;
     bangCong.keo -= keo;
     bangCong.bill -= bill;
     bangCong.anh -= anh;
     bangCong.tinh_tien -= totalMoney;
 
-    // Thêm log bài nộp đã trừ
-    if (!bangCong.log_da_tru) {
-      bangCong.log_da_tru = [];
-    }
-    bangCong.log_da_tru.push(submissionRecord);
+    // Lưu thông tin bài nộp đã xử lý
+    const processedSubmission = new ProcessedSubmission({
+      groupId: chatId,
+      userId: userId,
+      ten: normalizeName(ten),
+      submissionTime: submissionDate,
+      date: normalizedMessageDate,
+      quay,
+      keo,
+      bill,
+      anh,
+      totalMoney
+    });
 
-    // Lưu lại bản ghi đã chỉnh sửa
-    await bangCong.save();
+    // Lưu cả hai thay đổi trong một transaction
+    const session = await mongoose.startSession();
+    await session.withTransaction(async () => {
+      await bangCong.save({ session });
+      await processedSubmission.save({ session });
+    });
+    session.endSession();
 
-    bot.sendMessage(chatId, `Trừ thành công bài nộp này cho ${ten.trim()}.`);
+    bot.sendMessage(chatId, `Trừ thành công bài nộp này cho ${ten}.`);
   } catch (error) {
     console.error('Lỗi khi cập nhật dữ liệu:', error);
     bot.sendMessage(chatId, 'Đã xảy ra lỗi khi cập nhật dữ liệu.');
