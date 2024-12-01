@@ -2133,9 +2133,20 @@ timeSlots.forEach((slot, index) => {
   const [hour, minute] = slot.time.split(':').map(Number);
 
   schedule.scheduleJob({ hour, minute, tz: 'Asia/Ho_Chi_Minh' }, async () => {
+    // Check and clean up previous unfinished attendance
+    const previousCa = `ca_${index}`;
+    if (index > 0) {
+      const previousAttendance = await Attendance.findOne({ ca: previousCa });
+      if (previousAttendance && !previousAttendance.isLocked) {
+        await Attendance.deleteOne({ ca: previousCa });
+        console.log(`🔄 Cleaned up unfinished attendance for ${previousCa}`);
+      }
+    }
+
     const label = slot.label;
     currentCa = `ca_${index + 1}`;
 
+    // Reset bill-related variables
     billImagesCount = 0;
     billImages = [];
     upBillMembers = [];
@@ -2145,6 +2156,7 @@ timeSlots.forEach((slot, index) => {
     await attendance.save();
 
     bot.sendMessage(groupId, `🔔 Điểm danh ${label}! Mọi người báo số thứ tự đi`);
+  
 
     const messageHandler = async (msg) => {
       if (msg.chat.id !== groupId) return;
@@ -2154,34 +2166,42 @@ timeSlots.forEach((slot, index) => {
         const isAdmin = adminIds.includes(msg.from.id) || 
                        ['creator', 'administrator'].includes(chatMember.status);
 
-        if (isWaitingForBills && msg.photo && isAdmin) {
-          const photoId = msg.photo[msg.photo.length - 1].file_id;
-          billImages.push({
-            photoId: photoId,
-            caption: msg.caption || ''
-          });
-          billImagesCount++;
+       // Modify the photo handler part in messageHandler function
+if (isWaitingForBills && msg.photo && isAdmin) {
+  const photoId = msg.photo[msg.photo.length - 1].file_id;
+  
+  // Check if this photo was already added
+  if (!billImages.some(img => img.photoId === photoId)) {
+    billImages.push({
+      photoId: photoId,
+      caption: msg.caption || ''
+    });
+    billImagesCount++;
 
-          if (billImagesCount === 3) {
-            for (let i = 0; i < Math.min(3, upBillMembers.length); i++) {
-              const member = upBillMembers[i];
-              try {
-                await bot.sendPhoto(groupId, billImages[i].photoId, {
-                  caption: `Bill ${label} của [${member.name}](tg://user?id=${member.userId}) - STT: ${member.number}\n`,
-                  parse_mode: 'Markdown',
-                  message_thread_id: topicId
-                });
-              } catch (error) {
-                console.error('Lỗi gửi ảnh:', error);
-              }
-            }
-            isWaitingForBills = false;
-            billImagesCount = 0;
-            billImages = [];
-            bot.removeListener('message', messageHandler);
-          }
-          return;
+   
+
+    // Process bills only when exactly 3 photos are received
+    if (billImagesCount === 3) {
+      for (let i = 0; i < Math.min(3, upBillMembers.length); i++) {
+        const member = upBillMembers[i];
+        try {
+          await bot.sendPhoto(groupId, billImages[i].photoId, {
+            caption: `Bill ${timeSlots[parseInt(currentCa.split('_')[1]) - 1].label} của [${member.name}](tg://user?id=${member.userId}) - STT: ${member.number}\n`,
+            parse_mode: 'Markdown',
+            message_thread_id: topicId
+          });
+        } catch (error) {
+          console.error('Lỗi gửi ảnh:', error);
         }
+      }
+      isWaitingForBills = false;
+      billImagesCount = 0;
+      billImages = [];
+      bot.removeListener('message', messageHandler);
+    }
+  }
+  return;
+}
 
         let text = msg.text;
         let targetUserId;
@@ -2195,6 +2215,11 @@ timeSlots.forEach((slot, index) => {
 
         if (!text || !/^\d+([.,\s]+\d+)*$/.test(text)) return;
 
+        const numbers = text.split(/[.,\s]+/)
+       .map(Number)
+       .filter(num => num >= 1 && num <= 15); // Only accept numbers 1-15
+
+if (numbers.length === 0) return;
         const memberName = targetUserId ? 
           (msg.reply_to_message.from.first_name || msg.reply_to_message.from.username) :
           (msg.from.first_name || msg.from.username);
