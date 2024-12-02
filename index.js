@@ -2229,7 +2229,7 @@ if (numbers.length === 0) return;
           (msg.reply_to_message.from.first_name || msg.reply_to_message.from.username) :
           (msg.from.first_name || msg.from.username);
         const userId = targetUserId || msg.from.id;
-        const numbers = text.split(/[.,\s]+/).map(Number);
+        
         
         const currentAttendance = await Attendance.findOne({ ca: currentCa });
         if (!currentAttendance || currentAttendance.isLocked) return;
