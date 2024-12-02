@@ -904,13 +904,33 @@ async function generateSchedule(bot, chatId) {
     return bot.sendMessage(chatId, `Không tìm thấy bảng công của ngày ${yesterdayStr}.`);
   }
 
+  // Định nghĩa các khung giờ đăng bài theo các ca
   const timeRanges = [
-    { start: '10:30', end: '11:30', ca: 'Ca1' },
-    { start: '12:30', end: '14:30', ca: 'Ca2' },
-    { start: '15:30', end: '18:00', ca: 'Ca3' },
-    { start: '18:50', end: '19:30', ca: 'Ca4' }
+    { ca: 1, start: '10:30', end: '11:30' },
+    { ca: 2, start: '12:30', end: '14:30' },
+    { ca: 3, start: '15:30', end: '18:00' },
+    { ca: 4, start: '18:50', end: '19:30' }
   ];
 
+  // Phân tích lịch sử nộp bài của từng thành viên
+  const memberPreferences = {};
+  bangCongList.forEach(member => {
+    const { caData = {}, ten } = member;
+    memberPreferences[ten] = {
+      availableCas: Object.entries(caData)
+        .filter(([_, value]) => value > 0)
+        .map(([ca]) => parseInt(ca.replace('Ca', ''))),
+      maxAcc: Math.max(
+        caData.Ca1 || 0,
+        caData.Ca2 || 0,
+        caData.Ca3 || 0,
+        caData.Ca4 || 0,
+        caData.Ca5 || 0
+      )
+    };
+  });
+
+  // Hàm chuyển đổi thời gian
   function timeToMinutes(timeStr) {
     const [hours, minutes] = timeStr.split(':').map(Number);
     return hours * 60 + minutes;
@@ -922,55 +942,53 @@ async function generateSchedule(bot, chatId) {
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
   }
 
-  // Tạo thời gian ngẫu nhiên trong từng khung giờ
-  const allPossibleTimes = timeRanges.flatMap(range => {
-    let currentMinute = timeToMinutes(range.start);
-    const endMinute = timeToMinutes(range.end);
-    const times = [];
+  // Tạo slots thời gian cho từng ca
+  const timeSlots = {};
+  timeRanges.forEach(range => {
+    const { ca, start, end } = range;
+    timeSlots[ca] = [];
+    
+    let currentMinute = timeToMinutes(start);
+    const endMinute = timeToMinutes(end);
+    
     while (currentMinute < endMinute) {
-      times.push(minutesToTime(currentMinute));
-      currentMinute += Math.floor(Math.random() * 11) + 10;
+      timeSlots[ca].push(minutesToTime(currentMinute));
+      currentMinute += Math.floor(Math.random() * 11) + 10; // 10-20 phút
     }
-    return times.sort(() => Math.random() - 0.5); // Xáo trộn thời gian trong ca
+    
+    // Xáo trộn slots trong mỗi ca
+    timeSlots[ca] = timeSlots[ca].sort(() => Math.random() - 0.5);
   });
 
+  // Phân bổ thời gian đăng bài
   const schedule = [];
-  let usedTimes = new Set(); // Để tránh lặp thời gian
-
-  // Phân chia bài đăng theo ca ưu tiên của từng thành viên
-  for (const member of bangCongList) {
-    const { caData = {}, ten } = member;
-
-    // Tìm ca có số lần nộp bài nhiều nhất
-    const sortedCa = Object.entries(caData)
-      .filter(([ca, count]) => count > 0) // Chỉ giữ các ca có dữ liệu
-      .sort(([, a], [, b]) => b - a); // Sắp xếp giảm dần theo số lần nộp bài
-
-    for (const [ca, count] of sortedCa) {
-      const timeRange = timeRanges.find(range => range.ca === ca);
-      if (timeRange) {
-        // Lấy thời gian phù hợp từ khung giờ
-        const timesInCa = allPossibleTimes.filter(
-          time =>
-            timeToMinutes(time) >= timeToMinutes(timeRange.start) &&
-            timeToMinutes(time) <= timeToMinutes(timeRange.end) &&
-            !usedTimes.has(time)
-        );
-
-        for (let i = 0; i < count; i++) {
-          if (timesInCa[i]) {
-            schedule.push({
-              member: ten,
-              time: timesInCa[i]
-            });
-            usedTimes.add(timesInCa[i]); // Đánh dấu thời gian đã dùng
-          }
+  
+  Object.entries(memberPreferences).forEach(([memberName, prefs]) => {
+    const postsNeeded = prefs.maxAcc;
+    const availableCas = prefs.availableCas;
+    
+    let postsAssigned = 0;
+    while (postsAssigned < postsNeeded) {
+      // Lặp qua các ca mà thành viên có thể đăng bài
+      for (const ca of availableCas) {
+        if (postsAssigned >= postsNeeded) break;
+        
+        if (timeSlots[ca] && timeSlots[ca].length > 0) {
+          const time = timeSlots[ca].shift();
+          schedule.push({
+            member: memberName,
+            time,
+            ca
+          });
+          postsAssigned++;
         }
       }
+      
+      if (availableCas.every(ca => timeSlots[ca].length === 0)) break;
     }
-  }
+  });
 
-  // Sắp xếp lịch đăng bài theo thời gian
+  // Sắp xếp lịch theo thời gian
   schedule.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
 
   // Tạo và gửi bảng phân công
@@ -979,12 +997,12 @@ async function generateSchedule(bot, chatId) {
       node [shape=plaintext];
       a [label=<
         <TABLE BORDER="2" CELLBORDER="1" CELLSPACING="0" CELLPADDING="8" STYLE="font-family: 'Montserrat', sans-serif; border: 3px solid black;">
-          <TR><TD COLSPAN="2" ALIGN="CENTER" BGCOLOR="#1976D2" STYLE="font-size: 24px; font-weight: bold; color: white;">Lịch Đăng Bài ${today.toLocaleDateString()}</TD></TR>
+          <TR><TD COLSPAN="3" ALIGN="CENTER" BGCOLOR="#1976D2" STYLE="font-size: 24px; font-weight: bold; color: white;">Lịch Đăng Bài ${today.toLocaleDateString()}</TD></TR>
           <TR STYLE="background-color: #2196F3; color: white; font-weight: bold;">
-            <TD>Thời Gian</TD><TD>Thành Viên</TD>
+            <TD>Thời Gian</TD><TD>Thành Viên</TD><TD>Ca</TD>
           </TR>
           ${schedule.map(item => 
-            `<TR><TD>${item.time}</TD><TD>${item.member}</TD></TR>`
+            `<TR><TD>${item.time}</TD><TD>${item.member}</TD><TD>${item.ca}</TD></TR>`
           ).join('')}
         </TABLE>
       >];
@@ -994,7 +1012,6 @@ async function generateSchedule(bot, chatId) {
   const url = 'https://quickchart.io/graphviz?format=png&layout=dot&graph=';
   const imageUrl = `${url}${encodeURIComponent(graph)}`;
   
-  // Gửi ảnh vào group với message_thread_id
   await bot.sendPhoto(-1002280909865, imageUrl, {
     caption: `Lịch Đăng Bài Ngày ${today.toLocaleDateString()}`,
     message_thread_id: 42
