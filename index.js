@@ -897,62 +897,86 @@ async function generateSchedule(bot, chatId) {
   yesterday.setDate(today.getDate() - 1);
   const yesterdayStr = yesterday.toLocaleDateString();
 
+  // Lấy bảng công của ngày hôm qua
   const bangCongList = await Trasua.find({ groupId: -1002280909865, date: yesterdayStr });
 
   if (bangCongList.length === 0) {
     return bot.sendMessage(chatId, `Không tìm thấy bảng công của ngày ${yesterdayStr}.`);
   }
 
-  // Định nghĩa các khung giờ đăng bài theo ca
-  const timeSlots = [
-    { name: 'Ca 1', start: '10:30', end: '11:30' },
-    { name: 'Ca 2', start: '12:30', end: '14:30' },
-    { name: 'Ca 3', start: '15:30', end: '18:00' },
-    { name: 'Ca 4', start: '18:50', end: '19:30' }
-  ];
+  // Định nghĩa các khung giờ đăng bài theo các ca
+const timeRanges = [
+{ start: '10:30', end: '11:30' }, //tương ứng ca 1
+{ start: '12:30', end: '14:30' }, //tương ứng ca 2
+{ start: '15:30', end: '18:00' }, //tương ứng ca 3
+{ start: '18:50', end: '19:30' }, //tương ứng ca 4
+];
 
+  // Chuyển đổi thời gian sang phút
   function timeToMinutes(timeStr) {
     const [hours, minutes] = timeStr.split(':').map(Number);
     return hours * 60 + minutes;
   }
 
+  // Chuyển đổi phút sang định dạng thời gian
   function minutesToTime(minutes) {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
   }
 
-  // Tạo lịch cho từng ca
-  const schedule = [];
-  const members = bangCongList.map(member => member.ten);
-
-  timeSlots.forEach((slot, slotIndex) => {
-    const slotStart = timeToMinutes(slot.start);
-    const slotEnd = timeToMinutes(slot.end);
-    const slotDuration = slotEnd - slotStart;
+  // Tạo danh sách tất cả các khoảng thời gian có thể
+  let allPossibleTimes = [];
+  timeRanges.forEach(range => {
+    let currentMinute = timeToMinutes(range.start);
+    const endMinute = timeToMinutes(range.end);
     
-    // Số lượng bài đăng cho mỗi ca
-    const postsPerSlot = Math.ceil(members.length / timeSlots.length);
-    
-    // Chọn ngẫu nhiên các thành viên cho ca này
-    const shuffledMembers = [...members].sort(() => Math.random() - 0.5);
-    const slotMembers = shuffledMembers.slice(0, postsPerSlot);
-    
-    // Phân bổ thời gian đều trong ca
-    slotMembers.forEach((member, index) => {
-      const timeSpacing = Math.floor(slotDuration / (slotMembers.length + 1));
-      const postTime = slotStart + timeSpacing * (index + 1);
-      
-      schedule.push({
-        member: member,
-        time: minutesToTime(postTime),
-        ca: slot.name
-      });
-    });
+    while (currentMinute < endMinute) {
+      allPossibleTimes.push(minutesToTime(currentMinute));
+      // Thêm random 10-20 phút
+      currentMinute += Math.floor(Math.random() * 11) + 10; // 10-20 phút
+    }
   });
 
+  // Xáo trộn mảng thời gian
+  allPossibleTimes = allPossibleTimes.sort(() => Math.random() - 0.5);
+
+  // Tạo lịch đăng bài dựa trên số acc cao nhất của mỗi thành viên
+  const schedule = [];
+  let timeIndex = 0;
+
+  for (const member of bangCongList) {
+    const { caData = {}, ten } = member;
+    
+    // Tìm số acc cao nhất trong các ca của thành viên
+    const maxAcc = Math.max(
+      caData.Ca1 || 0,
+      caData.Ca2 || 0,
+      caData.Ca3 || 0,
+      caData.Ca4 || 0,
+      caData.Ca5 || 0
+    );
+
+    // Nếu thành viên có acc > 0, phân bổ số bài đăng tương ứng
+    if (maxAcc > 0) {
+      for (let i = 0; i < maxAcc; i++) {
+        if (timeIndex < allPossibleTimes.length) {
+          schedule.push({
+            member: ten,
+            time: allPossibleTimes[timeIndex]
+          });
+          timeIndex++;
+        }
+      }
+    }
+  }
+
   // Sắp xếp lịch theo thời gian
-  schedule.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+  schedule.sort((a, b) => {
+    const timeA = timeToMinutes(a.time);
+    const timeB = timeToMinutes(b.time);
+    return timeA - timeB;
+  });
 
   // Tạo và gửi bảng phân công
   const graph = `
@@ -960,12 +984,12 @@ async function generateSchedule(bot, chatId) {
       node [shape=plaintext];
       a [label=<
         <TABLE BORDER="2" CELLBORDER="1" CELLSPACING="0" CELLPADDING="8" STYLE="font-family: 'Montserrat', sans-serif; border: 3px solid black;">
-          <TR><TD COLSPAN="3" ALIGN="CENTER" BGCOLOR="#1976D2" STYLE="font-size: 24px; font-weight: bold; color: white;">Lịch Đăng Bài ${today.toLocaleDateString()}</TD></TR>
+          <TR><TD COLSPAN="2" ALIGN="CENTER" BGCOLOR="#1976D2" STYLE="font-size: 24px; font-weight: bold; color: white;">Lịch Đăng Bài ${today.toLocaleDateString()}</TD></TR>
           <TR STYLE="background-color: #2196F3; color: white; font-weight: bold;">
-            <TD>Thời Gian</TD><TD>Thành Viên</TD><TD>Ca</TD>
+            <TD>Thời Gian</TD><TD>Thành Viên</TD>
           </TR>
           ${schedule.map(item => 
-            `<TR><TD>${item.time}</TD><TD>${item.member}</TD><TD>${item.ca}</TD></TR>`
+            `<TR><TD>${item.time}</TD><TD>${item.member}</TD></TR>`
           ).join('')}
         </TABLE>
       >];
@@ -975,11 +999,13 @@ async function generateSchedule(bot, chatId) {
   const url = 'https://quickchart.io/graphviz?format=png&layout=dot&graph=';
   const imageUrl = `${url}${encodeURIComponent(graph)}`;
   
+  // Gửi ảnh vào group với message_thread_id
   await bot.sendPhoto(-1002280909865, imageUrl, {
     caption: `Lịch Đăng Bài Ngày ${today.toLocaleDateString()}`,
     message_thread_id: 42
   });
 }
+
 
 cron.schedule('0 9 * * *', async () => {
   try {
