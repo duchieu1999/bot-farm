@@ -904,79 +904,74 @@ async function generateSchedule(bot, chatId) {
     return bot.sendMessage(chatId, `Không tìm thấy bảng công của ngày ${yesterdayStr}.`);
   }
 
-  // Định nghĩa các khung giờ đăng bài
   const timeRanges = [
-    { start: '10:30', end: '11:30' },
-    { start: '12:30', end: '14:30' },
-    { start: '15:30', end: '18:00' },
-    { start: '18:20', end: '19:30' }
+    { start: '10:30', end: '11:30', ca: 'Ca1' },
+    { start: '12:30', end: '14:30', ca: 'Ca2' },
+    { start: '15:30', end: '18:00', ca: 'Ca3' },
+    { start: '18:50', end: '19:30', ca: 'Ca4' }
   ];
 
-  // Chuyển đổi thời gian sang phút
   function timeToMinutes(timeStr) {
     const [hours, minutes] = timeStr.split(':').map(Number);
     return hours * 60 + minutes;
   }
 
-  // Chuyển đổi phút sang định dạng thời gian
   function minutesToTime(minutes) {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
   }
 
-  // Tạo danh sách tất cả các khoảng thời gian có thể
-  let allPossibleTimes = [];
-  timeRanges.forEach(range => {
+  // Tạo thời gian ngẫu nhiên trong từng khung giờ
+  const allPossibleTimes = timeRanges.flatMap(range => {
     let currentMinute = timeToMinutes(range.start);
     const endMinute = timeToMinutes(range.end);
-    
+    const times = [];
     while (currentMinute < endMinute) {
-      allPossibleTimes.push(minutesToTime(currentMinute));
-      // Thêm random 10-20 phút
-      currentMinute += Math.floor(Math.random() * 11) + 10; // 10-20 phút
+      times.push(minutesToTime(currentMinute));
+      currentMinute += Math.floor(Math.random() * 11) + 10;
     }
+    return times.sort(() => Math.random() - 0.5); // Xáo trộn thời gian trong ca
   });
 
-  // Xáo trộn mảng thời gian
-  allPossibleTimes = allPossibleTimes.sort(() => Math.random() - 0.5);
-
-  // Tạo lịch đăng bài dựa trên số acc cao nhất của mỗi thành viên
   const schedule = [];
-  let timeIndex = 0;
+  let usedTimes = new Set(); // Để tránh lặp thời gian
 
+  // Phân chia bài đăng theo ca ưu tiên của từng thành viên
   for (const member of bangCongList) {
     const { caData = {}, ten } = member;
-    
-    // Tìm số acc cao nhất trong các ca của thành viên
-    const maxAcc = Math.max(
-      caData.Ca1 || 0,
-      caData.Ca2 || 0,
-      caData.Ca3 || 0,
-      caData.Ca4 || 0,
-      caData.Ca5 || 0
-    );
 
-    // Nếu thành viên có acc > 0, phân bổ số bài đăng tương ứng
-    if (maxAcc > 0) {
-      for (let i = 0; i < maxAcc; i++) {
-        if (timeIndex < allPossibleTimes.length) {
-          schedule.push({
-            member: ten,
-            time: allPossibleTimes[timeIndex]
-          });
-          timeIndex++;
+    // Tìm ca có số lần nộp bài nhiều nhất
+    const sortedCa = Object.entries(caData)
+      .filter(([ca, count]) => count > 0) // Chỉ giữ các ca có dữ liệu
+      .sort(([, a], [, b]) => b - a); // Sắp xếp giảm dần theo số lần nộp bài
+
+    for (const [ca, count] of sortedCa) {
+      const timeRange = timeRanges.find(range => range.ca === ca);
+      if (timeRange) {
+        // Lấy thời gian phù hợp từ khung giờ
+        const timesInCa = allPossibleTimes.filter(
+          time =>
+            timeToMinutes(time) >= timeToMinutes(timeRange.start) &&
+            timeToMinutes(time) <= timeToMinutes(timeRange.end) &&
+            !usedTimes.has(time)
+        );
+
+        for (let i = 0; i < count; i++) {
+          if (timesInCa[i]) {
+            schedule.push({
+              member: ten,
+              time: timesInCa[i]
+            });
+            usedTimes.add(timesInCa[i]); // Đánh dấu thời gian đã dùng
+          }
         }
       }
     }
   }
 
-  // Sắp xếp lịch theo thời gian
-  schedule.sort((a, b) => {
-    const timeA = timeToMinutes(a.time);
-    const timeB = timeToMinutes(b.time);
-    return timeA - timeB;
-  });
+  // Sắp xếp lịch đăng bài theo thời gian
+  schedule.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
 
   // Tạo và gửi bảng phân công
   const graph = `
@@ -1006,6 +1001,7 @@ async function generateSchedule(bot, chatId) {
   });
 }
 
+
 cron.schedule('0 9 * * *', async () => {
   try {
     console.log('Đang tạo và gửi lịch đăng bài tự động...');
@@ -1020,7 +1016,7 @@ cron.schedule('0 9 * * *', async () => {
 });
 
 // Lệnh /chiabill
-bot.onText(/\/dangbail/, async (msg) => {
+bot.onText(/\/dangbai/, async (msg) => {
   const chatId = msg.chat.id;
   await generateSchedule(bot, chatId);
 });
