@@ -905,11 +905,10 @@ async function generateSchedule(bot, chatId) {
 
   // Định nghĩa khung giờ cho từng ca
   const shiftTimeRanges = {
-    Ca1: { start: '10:30', end: '11:30' },
-    Ca2: { start: '12:30', end: '14:30' },
-    Ca3: { start: '15:30', end: '18:00' },
-    Ca4: { start: '18:50', end: '19:30' },
-    Ca5: { start: '20:00', end: '21:00' }
+    Ca1: { start: '10:30', end: '11:30', billCount: 2 },
+    Ca2: { start: '12:30', end: '14:30', billCount: 3 },
+    Ca3: { start: '15:30', end: '18:00', billCount: 3 },
+    Ca4: { start: '18:50', end: '19:30', billCount: 2 }
   };
 
   function timeToMinutes(timeStr) {
@@ -941,24 +940,41 @@ async function generateSchedule(bot, chatId) {
   }
 
   const schedule = [];
+  const shiftMembers = {};
 
+  // Khởi tạo danh sách thành viên cho mỗi ca
+  Object.keys(shiftTimeRanges).forEach(shift => {
+    shiftMembers[shift] = [];
+  });
+
+  // Phân loại thành viên theo ca
   for (const member of bangCongList) {
     const { caData = {}, ten } = member;
     
-    // Xử lý từng ca cho thành viên
     for (const [shift, acc] of Object.entries(caData)) {
       if (acc > 0 && shiftTimeRanges[shift]) {
-        const { start, end } = shiftTimeRanges[shift];
-        const times = generateTimesForShift(start, end, acc);
-        
-        times.forEach(time => {
-          schedule.push({
-            member: ten,
-            time,
-            shift
-          });
-        });
+        shiftMembers[shift].push(ten);
       }
+    }
+  }
+
+  // Phân công đăng bill cho từng ca
+  for (const [shift, members] of Object.entries(shiftMembers)) {
+    if (members.length > 0) {
+      const { start, end, billCount } = shiftTimeRanges[shift];
+      const times = generateTimesForShift(start, end, billCount);
+      
+      // Phân phối các lần đăng bill cho các thành viên trong ca
+      let memberIndex = 0;
+      times.forEach(time => {
+        const member = members[memberIndex % members.length];
+        schedule.push({
+          member,
+          time,
+          shift
+        });
+        memberIndex++;
+      });
     }
   }
 
@@ -971,7 +987,7 @@ async function generateSchedule(bot, chatId) {
       node [shape=plaintext];
       a [label=<
         <TABLE BORDER="2" CELLBORDER="1" CELLSPACING="0" CELLPADDING="8" STYLE="font-family: 'Montserrat', sans-serif; border: 3px solid black;">
-          <TR><TD COLSPAN="3" ALIGN="CENTER" BGCOLOR="#1976D2" STYLE="font-size: 24px; font-weight: bold; color: white;">Lịch Đăng Bài ${today.toLocaleDateString()}</TD></TR>
+          <TR><TD COLSPAN="3" ALIGN="CENTER" BGCOLOR="#1976D2" STYLE="font-size: 24px; font-weight: bold; color: white;">Lịch Đăng Bill ${today.toLocaleDateString()}</TD></TR>
           <TR STYLE="background-color: #2196F3; color: white; font-weight: bold;">
             <TD>Thời Gian</TD><TD>Thành Viên</TD><TD>Ca</TD>
           </TR>
@@ -987,7 +1003,7 @@ async function generateSchedule(bot, chatId) {
   const imageUrl = `${url}${encodeURIComponent(graph)}`;
   
   await bot.sendPhoto(-1002280909865, imageUrl, {
-    caption: `Lịch Đăng Bài Ngày ${today.toLocaleDateString()}`,
+    caption: `Lịch Đăng Bill Ngày ${today.toLocaleDateString()}`,
     message_thread_id: 42
   });
 }
