@@ -891,7 +891,119 @@ bot.onText(/\/444/, async (msg) => {
 });
 
 
+async function generateSchedule(bot, chatId) {
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  const yesterdayStr = yesterday.toLocaleDateString();
 
+  // Lấy bảng công của ngày hôm qua
+  const bangCongList = await Trasua.find({ groupId: -1002280909865, date: yesterdayStr });
+
+  if (bangCongList.length === 0) {
+    return bot.sendMessage(chatId, `Không tìm thấy bảng công của ngày ${yesterdayStr}.`);
+  }
+
+  // Định nghĩa khung giờ cho các ca
+  const caTimeRanges = {
+    Ca1: { start: 10, end: 11 },
+    Ca2: { start: 12, end: 13 },
+    Ca3: { start: 14, end: 15 },
+    Ca4: { start: 16, end: 17 },
+    Ca5: { start: 18, end: 19 }
+  };
+
+  // Mảng lưu tất cả các khung giờ đã được chọn
+  const usedTimeSlots = [];
+
+  // Xử lý từng thành viên
+  const schedule = [];
+  for (const member of bangCongList) {
+    const { caData = {}, ten } = member;
+    
+    // Tìm số acc cao nhất trong các ca
+    const maxAcc = Math.max(...Object.values(caData).filter(v => typeof v === 'number'));
+    if (maxAcc <= 0) continue;
+
+    // Tìm các ca có acc > 0
+    const availableCas = Object.entries(caData)
+      .filter(([_, acc]) => acc > 0)
+      .map(([ca]) => ca);
+    if (availableCas.length === 0) continue;
+
+    // Phân bổ bài đăng
+    for (let i = 0; i < maxAcc; i++) {
+      let timeSlotFound = false;
+      let attempts = 0;
+      
+      while (!timeSlotFound && attempts < 50) {
+        // Random chọn một ca từ các ca có sẵn
+        const randomCa = availableCas[Math.floor(Math.random() * availableCas.length)];
+        const timeRange = caTimeRanges[randomCa];
+
+        // Tạo thời gian random trong khoảng của ca (sau 30-60 phút)
+        const hour = timeRange.start;
+        const baseMinute = Math.floor(Math.random() * 30) + 30; // 30-60 phút
+        
+        // Round minute to nearest 5
+        const minute = Math.round(baseMinute / 5) * 5;
+        
+        const timeSlot = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        
+        // Kiểm tra xem thời gian này đã được sử dụng chưa
+        if (!usedTimeSlots.includes(timeSlot)) {
+          schedule.push({
+            member: ten,
+            time: timeSlot,
+            postNumber: i + 1
+          });
+          usedTimeSlots.push(timeSlot);
+          timeSlotFound = true;
+        }
+        
+        attempts++;
+      }
+    }
+  }
+
+  // Sắp xếp lịch theo thời gian
+  schedule.sort((a, b) => {
+    const timeA = a.time.split(':').map(Number);
+    const timeB = b.time.split(':').map(Number);
+    return (timeA[0] * 60 + timeA[1]) - (timeB[0] * 60 + timeB[1]);
+  });
+
+  // Tạo và gửi bảng phân công
+  const graph = `
+    digraph G {
+      node [shape=plaintext];
+      a [label=<
+        <TABLE BORDER="2" CELLBORDER="1" CELLSPACING="0" CELLPADDING="8" STYLE="font-family: 'Montserrat', sans-serif; border: 3px solid black;">
+          <TR><TD COLSPAN="3" ALIGN="CENTER" BGCOLOR="#1976D2" STYLE="font-size: 24px; font-weight: bold; color: white;">Lịch Đăng Bài ${today.toLocaleDateString()}</TD></TR>
+          <TR STYLE="background-color: #2196F3; color: white; font-weight: bold;">
+            <TD>Thời Gian</TD><TD>Thành Viên</TD><TD>Bài Số</TD>
+          </TR>
+          ${schedule.map(item => 
+            `<TR><TD>${item.time}</TD><TD>${item.member}</TD><TD>${item.postNumber}</TD></TR>`
+          ).join('')}
+        </TABLE>
+      >];
+    }
+  `;
+
+  const url = 'https://quickchart.io/graphviz?format=png&layout=dot&graph=';
+  const imageUrl = `${url}${encodeURIComponent(graph)}`;
+  
+  await bot.sendPhoto(chatId, imageUrl, {
+    caption: `Lịch Đăng Bài Ngày ${today.toLocaleDateString()}`,
+  });
+}
+
+// Thêm lệnh /chiabill
+bot.onText(/\/chiabill/, async (msg) => {
+  const chatId = msg.chat.id;
+  await generateSchedule(bot, chatId);
+});
 
 
 
