@@ -784,6 +784,7 @@ async function generateReport(bot, chatId, days) {
   const groupName = 'BẢNG CÔNG NHÓM 5K';
   const url = 'https://quickchart.io/graphviz?format=png&layout=dot&graph=';
   let grandTotal = 0;
+  const memberSummary = {}; // Tổng hợp dữ liệu từng thành viên
   const dailyImages = [];
 
   for (const dateStr of dates) {
@@ -799,6 +800,15 @@ async function generateReport(bot, chatId, days) {
     let content = bangCongList.map(entry => {
       const { caData = {}, post = 0, acc = 0, tinh_tien, ten } = entry;
       const ca = [caData.Ca1, caData.Ca2, caData.Ca3, caData.Ca4, caData.Ca5].map(ca => ca > 0 ? ca : '-');
+      
+      // Cập nhật dữ liệu tổng hợp từng thành viên
+      if (!memberSummary[ten]) {
+        memberSummary[ten] = { acc: 0, posts: 0, total: 0 };
+      }
+      memberSummary[ten].acc += acc;
+      memberSummary[ten].posts += post;
+      memberSummary[ten].total += tinh_tien;
+
       return `${ten}\t${ca.join('\t')}\t${post > 0 ? post : '-'}\t${acc}\t${tinh_tien.toLocaleString()} vnđ`;
     }).join('\n');
 
@@ -839,18 +849,23 @@ async function generateReport(bot, chatId, days) {
     });
   }
 
+  // Bảng tổng kết tổng tiền
+  const summaryContent = Object.entries(memberSummary)
+    .map(([name, data]) => `<TR><TD>${name}</TD><TD>${data.acc}</TD><TD>${data.posts}</TD><TD>${data.total.toLocaleString()} vnđ</TD></TR>`)
+    .join('');
+
   const totalGraph = `
     digraph G {
       node [shape=plaintext];
       a [label=<
         <TABLE BORDER="2" CELLBORDER="1" CELLSPACING="0" CELLPADDING="8" STYLE="font-family: 'Montserrat', sans-serif; border: 3px solid black;">
-          <TR><TD COLSPAN="2" ALIGN="CENTER" BGCOLOR="#1976D2" STYLE="font-size: 24px; font-weight: bold; color: white;">Tổng Tiền ${days} Ngày</TD></TR>
+          <TR><TD COLSPAN="4" ALIGN="CENTER" BGCOLOR="#1976D2" STYLE="font-size: 24px; font-weight: bold; color: white;">Tổng Tiền ${days} Ngày</TD></TR>
           <TR STYLE="background-color: #2196F3; color: white; font-weight: bold;">
-            <TD>Ngày</TD><TD>Tổng Tiền</TD>
+            <TD>Tên</TD><TD>Tổng ACC</TD><TD>Bài Đăng</TD><TD>Tổng Số Tiền</TD>
           </TR>
-          ${dailyImages.map(({ dateStr, totalAmount }) => `<TR><TD>${dateStr}</TD><TD>${totalAmount.toLocaleString()} vnđ</TD></TR>`).join('')}
+          ${summaryContent}
           <TR STYLE="background-color: #1976D2; color: white; font-weight: bold;">
-            <TD>Tổng Cộng</TD><TD>${grandTotal.toLocaleString()} vnđ</TD>
+            <TD COLSPAN="3" ALIGN="LEFT">Tổng Cộng</TD><TD>${grandTotal.toLocaleString()} vnđ</TD>
           </TR>
         </TABLE>
       >];
@@ -874,6 +889,7 @@ bot.onText(/\/444/, async (msg) => {
   const chatId = msg.chat.id;
   await generateReport(bot, chatId, 4);
 });
+
 
 
 
@@ -1180,22 +1196,34 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    // Chỉ chấp nhận tin nhắn hoàn toàn khớp với regex
     if (messageContent) {
-      if (regex.test(messageContent)) {
-        await processSubmission(msg, msg);
+      // Lấy tất cả cụm hợp lệ bằng regex
+      const matches = messageContent.match(regex);
+      
+      // Nếu có cụm hợp lệ, so sánh với toàn bộ nội dung tin nhắn
+      if (matches) {
+        const cleanMessage = matches.join(' '); // Tạo chuỗi từ các cụm hợp lệ
+        if (cleanMessage === messageContent.trim()) {
+          // Nếu toàn bộ tin nhắn chỉ chứa cụm hợp lệ
+          await processSubmission(msg, msg);
+        }
       } else if (msg.reply_to_message && addRegex.test(messageContent)) {
         const repliedMessage = msg.reply_to_message;
         const repliedMessageContent = repliedMessage.text || repliedMessage.caption;
 
-        // Kiểm tra tin nhắn được trả lời có khớp regex
-        if (regex.test(repliedMessageContent)) {
-          await processSubmission(msg, repliedMessage);
+        // Kiểm tra nội dung tin nhắn được trả lời
+        const replyMatches = repliedMessageContent.match(regex);
+        if (replyMatches) {
+          const cleanRepliedMessage = replyMatches.join(' ');
+          if (cleanRepliedMessage === repliedMessageContent.trim()) {
+            await processSubmission(msg, repliedMessage);
+          }
         }
       }
     }
   }
 });
+
 
 
 
@@ -1210,10 +1238,13 @@ async function processSubmission(msg, targetMsg) {
   let bill = 0;
   let anh = 0;
 
-  if (matches) {
-    matches.forEach((match) => {
-      const number = parseInt(match.match(/\d+/)[0]);
-      const suffix = match.replace(/\d+\s*/, '').toLowerCase();
+ if (matches) {
+  matches.forEach((match) => {
+    const numberMatch = match.match(/\d+/); // Lấy số từ match
+    const suffix = match.replace(/\d+\s*/, '').toLowerCase(); // Lấy từ loại
+
+    if (numberMatch) { // Đảm bảo có số trong match
+      const number = parseInt(numberMatch[0]);
 
       if (suffix === 'q' || suffix === 'quẩy') {
         quay += number;
@@ -1224,8 +1255,10 @@ async function processSubmission(msg, targetMsg) {
       } else if (suffix === 'ảnh' || suffix === 'hình') {
         anh += number;
       }
-    });
-  }
+    }
+  });
+}
+
 
   const targetDate = new Date(targetMsg.date * 1000).toLocaleDateString();
   const submissionTime = new Date(targetMsg.date * 1000).toLocaleTimeString();
