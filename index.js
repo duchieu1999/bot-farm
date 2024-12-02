@@ -908,7 +908,8 @@ async function generateSchedule(bot, chatId) {
   const timeRanges = [
     { start: '10:30', end: '11:30' },
     { start: '12:30', end: '14:30' },
-    { start: '15:30', end: '18:00' }
+    { start: '15:30', end: '18:00' },
+    { start: '18:20', end: '19:30' }
   ];
 
   // Chuyển đổi thời gian sang phút
@@ -1005,11 +1006,25 @@ async function generateSchedule(bot, chatId) {
   });
 }
 
+cron.schedule('0 9 * * *', async () => {
+  try {
+    console.log('Đang tạo và gửi lịch đăng bài tự động...');
+    await generateSchedule(bot, -1002280909865); // Gọi trực tiếp với groupId
+    console.log('Đã gửi lịch đăng bài thành công!');
+  } catch (error) {
+    console.error('Lỗi khi gửi lịch đăng bài tự động:', error);
+  }
+}, {
+  scheduled: true,
+  timezone: "Asia/Ho_Chi_Minh" // Đặt múi giờ Việt Nam
+});
+
 // Lệnh /chiabill
-bot.onText(/\/chiabill/, async (msg) => {
+bot.onText(/\/dangbail/, async (msg) => {
   const chatId = msg.chat.id;
   await generateSchedule(bot, chatId);
 });
+
 
 
 
