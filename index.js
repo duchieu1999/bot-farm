@@ -1176,7 +1176,8 @@ bot.onText(/\/123456/, async (msg) => {
 
     
 const addRegex = /thêm/i;
-const regex = /(\d+\s*(quẩy|q|cộng|c|\+|bill|ảnh|hình))/gi;
+// Updated regex to handle submissions without spaces
+const regex = /(\d+\s*(?:quẩy|q|cộng|c|\+|bill|ảnh|hình))/gi;
 const EXCLUDED_CHAT_IDS = [
   -1002103270166, -1002397067352, -1002312409314, -1002280909865,
   -1002336524767, -1002295387259, -1002128975957, -1002322022623,
@@ -1187,39 +1188,34 @@ const EXCLUDED_CHAT_IDS = [
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
 
-  // Chỉ kiểm tra nếu không phải là nhóm có ID nằm trong danh sách loại trừ
   if (!EXCLUDED_CHAT_IDS.includes(chatId)) {
-    let messageContent = msg.text || msg.caption;
+    const messageContent = msg.text || msg.caption;
 
-    // Nếu tin nhắn chứa '@', '[', ']', hoặc '/' thì không kiểm tra bài nộp
     if (messageContent && /[@\[\]\/]/.test(messageContent)) {
       return;
     }
 
     if (messageContent) {
-      // Bước tiền xử lý: Chèn khoảng trắng giữa các cặp số + từ
-      messageContent = messageContent.replace(/(\d+)([a-zA-Z+]+)/g, '$1 $2');
-
-      // Lấy tất cả cụm hợp lệ bằng regex
       const matches = messageContent.match(regex);
-
+      
       if (matches) {
-        const cleanMessage = matches.join(' '); // Tạo chuỗi từ các cụm hợp lệ
-        if (cleanMessage === messageContent.trim()) {
-          // Nếu toàn bộ tin nhắn chỉ chứa cụm hợp lệ
+        // Remove all spaces from both strings for comparison
+        const cleanMessage = matches.join('').replace(/\s+/g, '');
+        const cleanOriginalMessage = messageContent.trim().replace(/\s+/g, '');
+        
+        if (cleanMessage === cleanOriginalMessage) {
           await processSubmission(msg, msg);
         }
       } else if (msg.reply_to_message && addRegex.test(messageContent)) {
         const repliedMessage = msg.reply_to_message;
-        let repliedMessageContent = repliedMessage.text || repliedMessage.caption;
-
-        // Tiền xử lý tin nhắn trả lời
-        repliedMessageContent = repliedMessageContent.replace(/(\d+)([a-zA-Z+]+)/g, '$1 $2');
+        const repliedMessageContent = repliedMessage.text || repliedMessage.caption;
 
         const replyMatches = repliedMessageContent.match(regex);
         if (replyMatches) {
-          const cleanRepliedMessage = replyMatches.join(' ');
-          if (cleanRepliedMessage === repliedMessageContent.trim()) {
+          const cleanRepliedMessage = replyMatches.join('').replace(/\s+/g, '');
+          const cleanOriginalRepliedMessage = repliedMessageContent.trim().replace(/\s+/g, '');
+          
+          if (cleanRepliedMessage === cleanOriginalRepliedMessage) {
             await processSubmission(msg, repliedMessage);
           }
         }
@@ -1227,7 +1223,6 @@ bot.on('message', async (msg) => {
     }
   }
 });
-
 
 
 
