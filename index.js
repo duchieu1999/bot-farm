@@ -1189,7 +1189,7 @@ bot.on('message', async (msg) => {
 
   // Chỉ kiểm tra nếu không phải là nhóm có ID nằm trong danh sách loại trừ
   if (!EXCLUDED_CHAT_IDS.includes(chatId)) {
-    const messageContent = msg.text || msg.caption;
+    let messageContent = msg.text || msg.caption;
 
     // Nếu tin nhắn chứa '@', '[', ']', hoặc '/' thì không kiểm tra bài nộp
     if (messageContent && /[@\[\]\/]/.test(messageContent)) {
@@ -1197,10 +1197,12 @@ bot.on('message', async (msg) => {
     }
 
     if (messageContent) {
+      // Bước tiền xử lý: Chèn khoảng trắng giữa các cặp số + từ
+      messageContent = messageContent.replace(/(\d+)([a-zA-Z+]+)/g, '$1 $2');
+
       // Lấy tất cả cụm hợp lệ bằng regex
       const matches = messageContent.match(regex);
-      
-      // Nếu có cụm hợp lệ, so sánh với toàn bộ nội dung tin nhắn
+
       if (matches) {
         const cleanMessage = matches.join(' '); // Tạo chuỗi từ các cụm hợp lệ
         if (cleanMessage === messageContent.trim()) {
@@ -1209,9 +1211,11 @@ bot.on('message', async (msg) => {
         }
       } else if (msg.reply_to_message && addRegex.test(messageContent)) {
         const repliedMessage = msg.reply_to_message;
-        const repliedMessageContent = repliedMessage.text || repliedMessage.caption;
+        let repliedMessageContent = repliedMessage.text || repliedMessage.caption;
 
-        // Kiểm tra nội dung tin nhắn được trả lời
+        // Tiền xử lý tin nhắn trả lời
+        repliedMessageContent = repliedMessageContent.replace(/(\d+)([a-zA-Z+]+)/g, '$1 $2');
+
         const replyMatches = repliedMessageContent.match(regex);
         if (replyMatches) {
           const cleanRepliedMessage = replyMatches.join(' ');
@@ -1223,6 +1227,7 @@ bot.on('message', async (msg) => {
     }
   }
 });
+
 
 
 
