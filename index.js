@@ -1177,8 +1177,15 @@ bot.onText(/\/123456/, async (msg) => {
     
 const addRegex = /thêm/i;
 const bayNhomRegex = /bay\s*nhóm/i;
-// Cập nhật regex để bỏ qua các ký tự đặc biệt giữa các submission
-const regex = /(\d+\s*(?:quẩy|q|cộng|c|\+|bill|ảnh|hình))/gi;
+// Updated regex to handle mixed characters and special formats
+const regex = /(\d+\s*(?:[qc()+]|quẩy|cộng|bill|ảnh|hình))/gi;
+
+const EXCLUDED_CHAT_IDS = [
+  -1002103270166, -1002397067352, -1002312409314, -1002280909865,
+  -1002336524767, -1002295387259, -1002128975957, -1002322022623,
+  -1002247863313, -1002192201870, -1002499533124,
+  -1002303292016, -1002128975957
+];
 
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
@@ -1186,32 +1193,25 @@ bot.on('message', async (msg) => {
   if (!EXCLUDED_CHAT_IDS.includes(chatId)) {
     const messageContent = msg.text || msg.caption;
 
-    // Chỉ bỏ qua tin nhắn có @ [ ] /
     if (messageContent && /[@\[\]\/]/.test(messageContent)) {
       return;
     }
 
     if (messageContent) {
-      // Kiểm tra nếu tin nhắn chứa "bay nhóm"
+      // Handle "bay nhóm" case
       if (bayNhomRegex.test(messageContent)) {
-        const matches = messageContent.match(regex);
-        if (matches) {
-          await processSubmission(msg, msg);
-        }
+        await processSubmission(msg, msg);
         return;
       }
 
       const matches = messageContent.match(regex);
       
       if (matches) {
-        // Loại bỏ tất cả ký tự đặc biệt và khoảng trắng để so sánh
-        const cleanMessage = matches.join('').replace(/[^0-9a-zA-Z]/g, '').toLowerCase();
-        const cleanOriginalMessage = messageContent
-          .replace(/[^0-9a-zA-Z\s]/g, '') // Giữ lại khoảng trắng cho việc tách từ
-          .replace(/\s+/g, '') // Sau đó mới xóa khoảng trắng
-          .toLowerCase();
-
-        // So sánh sau khi đã làm sạch
+        // Clean and normalize the message content
+        const cleanMessage = normalizeContent(matches.join(''));
+        const cleanOriginalMessage = normalizeContent(messageContent);
+        
+        // Compare normalized versions
         if (cleanMessage === cleanOriginalMessage) {
           await processSubmission(msg, msg);
         }
@@ -1219,22 +1219,10 @@ bot.on('message', async (msg) => {
         const repliedMessage = msg.reply_to_message;
         const repliedMessageContent = repliedMessage.text || repliedMessage.caption;
 
-        // Kiểm tra tin nhắn reply có chứa "bay nhóm"
-        if (bayNhomRegex.test(repliedMessageContent)) {
-          const replyMatches = repliedMessageContent.match(regex);
-          if (replyMatches) {
-            await processSubmission(msg, repliedMessage);
-          }
-          return;
-        }
-
         const replyMatches = repliedMessageContent.match(regex);
         if (replyMatches) {
-          const cleanRepliedMessage = replyMatches.join('').replace(/[^0-9a-zA-Z]/g, '').toLowerCase();
-          const cleanOriginalRepliedMessage = repliedMessageContent
-            .replace(/[^0-9a-zA-Z\s]/g, '')
-            .replace(/\s+/g, '')
-            .toLowerCase();
+          const cleanRepliedMessage = normalizeContent(replyMatches.join(''));
+          const cleanOriginalRepliedMessage = normalizeContent(repliedMessageContent);
           
           if (cleanRepliedMessage === cleanOriginalRepliedMessage) {
             await processSubmission(msg, repliedMessage);
@@ -1244,6 +1232,18 @@ bot.on('message', async (msg) => {
     }
   }
 });
+
+function normalizeContent(content) {
+  return content
+    .toLowerCase()
+    .replace(/\s+/g, '') // Remove spaces
+    .replace(/[(),]/g, '') // Remove parentheses and commas
+    .replace(/quẩy/g, 'q')
+    .replace(/cộng/g, 'c')
+    .replace(/\+/g, 'c')
+    .replace(/bill/g, 'c')
+    .replace(/ảnh|hình/g, 'c');
+}
 
 
 
