@@ -1240,9 +1240,8 @@ function normalizeContent(content) {
     .replace(/[(),]/g, '') // Remove parentheses and commas
     .replace(/quẩy/g, 'q')
     .replace(/cộng/g, 'c')
-    .replace(/\+/g, 'c')
-    .replace(/bill/g, 'c')
-    .replace(/ảnh|hình/g, 'c');
+    .replace(/\+/g, 'c');
+    
 }
 
 
