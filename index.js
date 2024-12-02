@@ -906,10 +906,10 @@ async function generateSchedule(bot, chatId) {
 
   // Định nghĩa các khung giờ đăng bài theo các ca
   const timeRanges = [
-    { ca: 1, start: '10:30', end: '11:30' },
-    { ca: 2, start: '12:30', end: '14:30' },
-    { ca: 3, start: '15:30', end: '18:00' },
-    { ca: 4, start: '18:50', end: '19:30' }
+    { ca: 'Ca1', start: '10:30', end: '11:30' },
+    { ca: 'Ca2', start: '12:30', end: '14:30' },
+    { ca: 'Ca3', start: '15:30', end: '18:00' },
+    { ca: 'Ca4', start: '18:50', end: '19:30' }
   ];
 
   // Phân tích lịch sử nộp bài của từng thành viên
@@ -918,8 +918,8 @@ async function generateSchedule(bot, chatId) {
     const { caData = {}, ten } = member;
     memberPreferences[ten] = {
       availableCas: Object.entries(caData)
-        .filter(([_, value]) => value > 0)
-        .map(([ca]) => parseInt(ca.replace('Ca', ''))),
+        .filter(([ca, value]) => value > 0 && ca.startsWith('Ca'))
+        .map(([ca]) => ca),
       maxAcc: Math.max(
         caData.Ca1 || 0,
         caData.Ca2 || 0,
@@ -978,13 +978,18 @@ async function generateSchedule(bot, chatId) {
           schedule.push({
             member: memberName,
             time,
-            ca
+            ca: ca.replace('Ca', '')
           });
           postsAssigned++;
         }
       }
       
-      if (availableCas.every(ca => timeSlots[ca].length === 0)) break;
+      // Kiểm tra xem còn slot trống trong các ca khả dụng không
+      const hasAvailableSlots = availableCas.some(ca => 
+        timeSlots[ca] && timeSlots[ca].length > 0
+      );
+      
+      if (!hasAvailableSlots) break;
     }
   });
 
