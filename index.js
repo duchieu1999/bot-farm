@@ -773,11 +773,9 @@ async function processAccMessage7(msg) {
 
 
 
-bot.onText(/\/333/, async (msg) => {
-  const chatId = msg.chat.id;
-
+async function generateReport(bot, chatId, days) {
   const dates = [];
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < days; i++) {
     const date = new Date();
     date.setDate(date.getDate() - i);
     dates.push(date.toLocaleDateString());
@@ -797,15 +795,11 @@ bot.onText(/\/333/, async (msg) => {
     }
 
     let totalAmount = 50000;
-    
+
     let content = bangCongList.map(entry => {
-      const ca1 = (entry.caData?.Ca1 || 0) > 0 ? entry.caData.Ca1 : '-';
-      const ca2 = (entry.caData?.Ca2 || 0) > 0 ? entry.caData.Ca2 : '-';
-      const ca3 = (entry.caData?.Ca3 || 0) > 0 ? entry.caData.Ca3 : '-';
-      const ca4 = (entry.caData?.Ca4 || 0) > 0 ? entry.caData.Ca4 : '-';
-      const ca5 = (entry.caData?.Ca5 || 0) > 0 ? entry.caData.Ca5 : '-';
-      const posts = (entry.post || 0) > 0 ? entry.post : '-';
-      return `${entry.ten}\t${ca1}\t${ca2}\t${ca3}\t${ca4}\t${ca5}\t${posts}\t${entry.acc}\t${entry.tinh_tien.toLocaleString()} vnđ`;
+      const { caData = {}, post = 0, acc = 0, tinh_tien, ten } = entry;
+      const ca = [caData.Ca1, caData.Ca2, caData.Ca3, caData.Ca4, caData.Ca5].map(ca => ca > 0 ? ca : '-');
+      return `${ten}\t${ca.join('\t')}\t${post > 0 ? post : '-'}\t${acc}\t${tinh_tien.toLocaleString()} vnđ`;
     }).join('\n');
 
     bangCongList.forEach(entry => {
@@ -816,38 +810,25 @@ bot.onText(/\/333/, async (msg) => {
 
     const graph = `
       digraph G {
-        graph [fontname = "Roboto"];
-        node [fontname = "Roboto"];
-        edge [fontname = "Roboto"];
         node [shape=plaintext];
         a [label=<
           <TABLE BORDER="2" CELLBORDER="1" CELLSPACING="0" CELLPADDING="8" STYLE="font-family: 'Montserrat', sans-serif; border: 3px solid black;">
-           <TR><TD COLSPAN="9" ALIGN="CENTER" BGCOLOR="#1976D2" STYLE="font-size: 26px; font-weight: 1000; color: white; padding: 15px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">${groupName}<FONT POINT-SIZE="20" STYLE="font-weight: 900;">${dateStr}</FONT></TD></TR>
-            <TR STYLE="font-weight: bold; background-color: #2196F3; color: white;">
-             <TD ALIGN="CENTER" STYLE="min-width: 130px;">Tên</TD>
-              <TD ALIGN="CENTER">CA 1<BR/><FONT POINT-SIZE="11">(10h)</FONT></TD>
-              <TD ALIGN="CENTER">CA 2<BR/><FONT POINT-SIZE="11">(12h)</FONT></TD>
-              <TD ALIGN="CENTER">CA 3<BR/><FONT POINT-SIZE="11">(15h)</FONT></TD>
-              <TD ALIGN="CENTER">CA 4<BR/><FONT POINT-SIZE="11">(18h30)</FONT></TD>
-              <TD ALIGN="CENTER">CA 5<BR/><FONT POINT-SIZE="11">(20h)</FONT></TD>
-              <TD ALIGN="CENTER">BÀI ĐĂNG</TD>
-              <TD ALIGN="CENTER">Tổng ACC</TD>
-              <TD ALIGN="CENTER" STYLE="min-width: 100px;">TIỀN CÔNG</TD>
+            <TR><TD COLSPAN="9" ALIGN="CENTER" BGCOLOR="#1976D2" STYLE="font-size: 26px; font-weight: bold; color: white;">${groupName}<FONT POINT-SIZE="20">${dateStr}</FONT></TD></TR>
+            <TR STYLE="background-color: #2196F3; color: white; font-weight: bold;">
+              <TD>Tên</TD><TD>CA 1</TD><TD>CA 2</TD><TD>CA 3</TD><TD>CA 4</TD><TD>CA 5</TD><TD>Bài Đăng</TD><TD>Tổng ACC</TD><TD>Tiền Công</TD>
             </TR>
-            ${content.split('\n').map(line => `<TR STYLE="font-size: 14px;"><TD ALIGN="LEFT" STYLE="font-weight: bold;">${line.split('\t').join('</TD><TD ALIGN="CENTER">')}</TD></TR>`).join('')}
-            <TR STYLE="font-weight: bold; background-color: #2196F3; color: white;">
-              <TD COLSPAN="8" ALIGN="LEFT">Quản Lý</TD>
-              <TD ALIGN="CENTER">50,000 vnđ</TD>
+            ${content.split('\n').map(line => `<TR><TD>${line.split('\t').join('</TD><TD>')}</TD></TR>`).join('')}
+            <TR STYLE="background-color: #2196F3; color: white; font-weight: bold;">
+              <TD COLSPAN="8" ALIGN="LEFT">Quản Lý</TD><TD>50,000 vnđ</TD>
             </TR>
-            <TR STYLE="font-weight: bold; background-color: #1976D2; color: white; font-size: 16px;">
-              <TD COLSPAN="8" ALIGN="LEFT">TỔNG SỐ TIỀN</TD>
-              <TD ALIGN="CENTER">${totalAmount.toLocaleString()} vnđ</TD>
+            <TR STYLE="background-color: #1976D2; color: white; font-weight: bold;">
+              <TD COLSPAN="8" ALIGN="LEFT">Tổng Số Tiền</TD><TD>${totalAmount.toLocaleString()} vnđ</TD>
             </TR>
           </TABLE>
         >];
       }
     `;
-    
+
     const imageUrl = `${url}${encodeURIComponent(graph)}`;
     dailyImages.push({ dateStr, imageUrl, totalAmount });
   }
@@ -860,21 +841,16 @@ bot.onText(/\/333/, async (msg) => {
 
   const totalGraph = `
     digraph G {
-      graph [fontname = "Roboto"];
-      node [fontname = "Roboto"];
-      edge [fontname = "Roboto"];
       node [shape=plaintext];
       a [label=<
         <TABLE BORDER="2" CELLBORDER="1" CELLSPACING="0" CELLPADDING="8" STYLE="font-family: 'Montserrat', sans-serif; border: 3px solid black;">
-          <TR><TD COLSPAN="2" ALIGN="CENTER" BGCOLOR="#1976D2" STYLE="font-size: 24px; font-weight: bold; color: white; padding: 12px;">Tổng Tiền 3 Ngày</TD></TR>
-          <TR STYLE="font-weight: bold; background-color: #2196F3; color: white; font-size: 16px;">
-            <TD ALIGN="CENTER" STYLE="min-width: 120px;">Ngày</TD>
-            <TD ALIGN="CENTER" STYLE="min-width: 150px;">Tổng Tiền</TD>
+          <TR><TD COLSPAN="2" ALIGN="CENTER" BGCOLOR="#1976D2" STYLE="font-size: 24px; font-weight: bold; color: white;">Tổng Tiền ${days} Ngày</TD></TR>
+          <TR STYLE="background-color: #2196F3; color: white; font-weight: bold;">
+            <TD>Ngày</TD><TD>Tổng Tiền</TD>
           </TR>
-          ${dailyImages.map(({ dateStr, totalAmount }) => `<TR STYLE="font-size: 14px;"><TD ALIGN="CENTER">${dateStr}</TD><TD ALIGN="CENTER">${totalAmount.toLocaleString()} vnđ</TD></TR>`).join('')}
-          <TR STYLE="font-weight: bold; background-color: #1976D2; color: white; font-size: 16px;">
-            <TD ALIGN="LEFT">Tổng Cộng</TD>
-            <TD ALIGN="CENTER">${grandTotal.toLocaleString()} vnđ</TD>
+          ${dailyImages.map(({ dateStr, totalAmount }) => `<TR><TD>${dateStr}</TD><TD>${totalAmount.toLocaleString()} vnđ</TD></TR>`).join('')}
+          <TR STYLE="background-color: #1976D2; color: white; font-weight: bold;">
+            <TD>Tổng Cộng</TD><TD>${grandTotal.toLocaleString()} vnđ</TD>
           </TR>
         </TABLE>
       >];
@@ -883,9 +859,22 @@ bot.onText(/\/333/, async (msg) => {
 
   const totalImageUrl = `${url}${encodeURIComponent(totalGraph)}`;
   await bot.sendPhoto(chatId, totalImageUrl, {
-    caption: `Tổng Kết Tiền Công Trong 3 Ngày`,
+    caption: `Tổng Kết Tiền Công Trong ${days} Ngày`,
   });
+}
+
+// Lệnh /333
+bot.onText(/\/333/, async (msg) => {
+  const chatId = msg.chat.id;
+  await generateReport(bot, chatId, 3);
 });
+
+// Lệnh /444
+bot.onText(/\/444/, async (msg) => {
+  const chatId = msg.chat.id;
+  await generateReport(bot, chatId, 4);
+});
+
 
 
 
@@ -1171,7 +1160,7 @@ bot.onText(/\/123456/, async (msg) => {
 
     
 const addRegex = /thêm/i;
-const regex = /\d+\s*(quẩy|q|cộng|c|\+|bill|ảnh|hình)/gi;
+const regex = /(\d+\s*(quẩy|q|cộng|c|\+|bill|ảnh|hình))/gi;
 const EXCLUDED_CHAT_IDS = [
   -1002103270166, -1002397067352, -1002312409314, -1002280909865,
   -1002336524767, -1002295387259, -1002128975957, -1002322022623,
@@ -1187,11 +1176,11 @@ bot.on('message', async (msg) => {
     const messageContent = msg.text || msg.caption;
 
     // Nếu tin nhắn chứa '@', '[', ']', hoặc '/' thì không kiểm tra bài nộp
-if (messageContent && /[@\[\]\/]/.test(messageContent)) {
-    return;
-}
+    if (messageContent && /[@\[\]\/]/.test(messageContent)) {
+      return;
+    }
 
-    
+    // Chỉ chấp nhận tin nhắn hoàn toàn khớp với regex
     if (messageContent) {
       if (regex.test(messageContent)) {
         await processSubmission(msg, msg);
@@ -1199,6 +1188,7 @@ if (messageContent && /[@\[\]\/]/.test(messageContent)) {
         const repliedMessage = msg.reply_to_message;
         const repliedMessageContent = repliedMessage.text || repliedMessage.caption;
 
+        // Kiểm tra tin nhắn được trả lời có khớp regex
         if (regex.test(repliedMessageContent)) {
           await processSubmission(msg, repliedMessage);
         }
@@ -1206,6 +1196,8 @@ if (messageContent && /[@\[\]\/]/.test(messageContent)) {
     }
   }
 });
+
+
 
 async function processSubmission(msg, targetMsg) {
   const messageContent = targetMsg.text || targetMsg.caption;
@@ -1264,11 +1256,18 @@ async function processSubmission(msg, targetMsg) {
     case -1002360155473:
       pricePerKeo = 1500;
       break;
+    case -1002360155473:
+      pricePerKeo = 500;
+      pricePerQuay = 1000;
+      pricePerBill = 1500;
+      pricePerAnh = 1500;
+      break;
     case -1002113921526:
     case -1002230199552:
     case -1002449707024:
     case -1002479414582:
     case -1002168066817:
+    case -1002278963130:
     case -1002392685048:
       pricePerKeo = 2000;
       break;
@@ -1355,7 +1354,7 @@ async function processSubmission(msg, targetMsg) {
 
 const allowedGroupIds = [
   -1002230199552, -1002360155473, -1002246062598, -1002392685048, -1002457468797, -1002383656659, -1002168066817, -1002449707024, -1002479414582, -1002160116020, -1002259135527, -1002349272974, -1002312409314, -1002439441449, -1002178207739, -1002235474314, -1002186698265, -1002205826480,
-  -1002311358141, -1002481836552, -1002245725621, -1002350493572, -1002300392959, -1002113921526, -1002243393101, -1002311651580
+  -1002311358141, -1002360155473, -1002317530934, -1002278963130, -1002481836552, -1002245725621, -1002350493572, -1002300392959, -1002113921526, -1002243393101, -1002311651580
 ];
 
 bot.onText(/\/lan/, async (msg) => {
@@ -1487,7 +1486,7 @@ async function sendAggregatedData2(chatId) {
     
 
 // Chức năng tự động gửi hình ảnh vào 9h sáng mỗi ngày (theo giờ Việt Nam)
-cron.schedule('30 1 * * *', async () => { // 2 giờ UTC là 9 giờ sáng theo giờ Việt Nam
+schedule.scheduleJob('10 9 * * *', async () => { // 2 giờ UTC là 9 giờ sáng theo giờ Việt Nam
   const chatId = '-1002103270166';
   await processAndDistributeOtherTimesheets(chatId);
 });
@@ -1508,6 +1507,9 @@ const managementFees = {
   '-1002449707024': 70000, 
   '-1002186698265': 75000,
   '-1002439441449': 80000, 
+  '-1002278963130': 100000,
+  '-1002317530934': 50000,
+  '-1002360155473': 80000,
   '-1002246062598': 50000,
   '-1002168066817': 200000, 
   '-1002350493572': 75000,
@@ -1804,6 +1806,9 @@ const kickbot = {
   "-1002123430691": "DẪN LỐI THÀNH CÔNG",
   "-1002143712364": "CÙNG NHAU CHIA SẺ",
   "-1002246062598": "guyi",
+  "-1002278963130": "gugugu",
+  "-1002317530934": "yuighu",
+  "-1002360155473": "bgkir",
   "-1002128975957": "HƯỚNG TỚI TƯƠNG LAI",
   "-1002080535296": "TRAO ĐỔI CÔNG VIỆC 2",
   "-1002091101362": "TRAO ĐỔI CÔNG VIỆC 1", 
@@ -2277,7 +2282,7 @@ if (numbers.length === 0) return;
         if (allNumbers.length >= 15 && !currentAttendance.isLocked) {
           currentAttendance.isLocked = true;
           await currentAttendance.save();
-          bot.sendMessage(groupId, `✅ Chốt điểm danh ${label}!`);
+          bot.sendMessage(groupId, `✅ Chốt điểm danh!`);
 
           const today = new Date();
           today.setHours(0, 0, 0, 0);
