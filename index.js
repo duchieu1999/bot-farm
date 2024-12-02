@@ -940,20 +940,33 @@ async function generateSchedule(bot, chatId) {
   // Xáo trộn mảng thời gian
   allPossibleTimes = allPossibleTimes.sort(() => Math.random() - 0.5);
 
-  // Tạo lịch đăng bài cho mỗi thành viên
+  // Tạo lịch đăng bài dựa trên số acc cao nhất của mỗi thành viên
   const schedule = [];
   let timeIndex = 0;
 
   for (const member of bangCongList) {
-    const { ten } = member;
+    const { caData = {}, ten } = member;
     
-    // Mỗi thành viên được chia một khung giờ
-    if (timeIndex < allPossibleTimes.length) {
-      schedule.push({
-        member: ten,
-        time: allPossibleTimes[timeIndex]
-      });
-      timeIndex++;
+    // Tìm số acc cao nhất trong các ca của thành viên
+    const maxAcc = Math.max(
+      caData.Ca1 || 0,
+      caData.Ca2 || 0,
+      caData.Ca3 || 0,
+      caData.Ca4 || 0,
+      caData.Ca5 || 0
+    );
+
+    // Nếu thành viên có acc > 0, phân bổ số bài đăng tương ứng
+    if (maxAcc > 0) {
+      for (let i = 0; i < maxAcc; i++) {
+        if (timeIndex < allPossibleTimes.length) {
+          schedule.push({
+            member: ten,
+            time: allPossibleTimes[timeIndex]
+          });
+          timeIndex++;
+        }
+      }
     }
   }
 
@@ -993,7 +1006,7 @@ async function generateSchedule(bot, chatId) {
 }
 
 // Lệnh /chiabill
-bot.onText(/\/dangbai/, async (msg) => {
+bot.onText(/\/chiabill/, async (msg) => {
   const chatId = msg.chat.id;
   await generateSchedule(bot, chatId);
 });
