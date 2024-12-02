@@ -903,13 +903,13 @@ async function generateSchedule(bot, chatId) {
     return bot.sendMessage(chatId, `Không tìm thấy bảng công của ngày ${yesterdayStr}.`);
   }
 
-  // Định nghĩa khung giờ cho từng ca
-  const shiftTimeRanges = {
-    Ca1: { start: '10:30', end: '11:30' },
-    Ca2: { start: '12:30', end: '14:30' },
-    Ca3: { start: '15:30', end: '18:00' },
-    Ca4: { start: '18:50', end: '19:30' }
-  };
+  // Định nghĩa các khung giờ đăng bài theo ca
+  const timeSlots = [
+    { name: 'Ca 1', start: '10:30', end: '11:30' },
+    { name: 'Ca 2', start: '12:30', end: '14:30' },
+    { name: 'Ca 3', start: '15:30', end: '18:00' },
+    { name: 'Ca 4', start: '18:50', end: '19:30' }
+  ];
 
   function timeToMinutes(timeStr) {
     const [hours, minutes] = timeStr.split(':').map(Number);
@@ -922,56 +922,39 @@ async function generateSchedule(bot, chatId) {
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
   }
 
-  // Tạo thời gian đăng bài cho từng ca
-  function generateTimesForShift(start, end, count) {
-    const times = [];
-    const startMinutes = timeToMinutes(start);
-    const endMinutes = timeToMinutes(end);
-    const duration = endMinutes - startMinutes;
-    
-    if (count <= 0) return times;
-    
-    // Chia đều khoảng thời gian cho số bài cần đăng
-    const interval = Math.floor(duration / (count + 1));
-    
-    for (let i = 1; i <= count; i++) {
-      const timeMinutes = startMinutes + (interval * i);
-      // Thêm độ ngẫu nhiên ±5 phút
-      const randomOffset = Math.floor(Math.random() * 11) - 5;
-      const finalTime = minutesToTime(Math.max(startMinutes, Math.min(endMinutes, timeMinutes + randomOffset)));
-      times.push(finalTime);
-    }
-    
-    return times;
-  }
+  // Tạo lịch cho từng ca
+  const schedule = [];
+  const members = bangCongList.map(member => member.ten);
 
-  // Tạo lịch đăng bài cho từng thành viên theo ca
-  let schedule = [];
-  
-  for (const member of bangCongList) {
-    const { caData = {}, ten } = member;
+  timeSlots.forEach((slot, slotIndex) => {
+    const slotStart = timeToMinutes(slot.start);
+    const slotEnd = timeToMinutes(slot.end);
+    const slotDuration = slotEnd - slotStart;
     
-    // Xử lý từng ca
-    for (const [shiftName, accCount] of Object.entries(caData)) {
-      if (accCount > 0 && shiftTimeRanges[shiftName]) {
-        const { start, end } = shiftTimeRanges[shiftName];
-        const times = generateTimesForShift(start, end, accCount);
-        
-        times.forEach(time => {
-          schedule.push({
-            member: ten,
-            time: time,
-            shift: shiftName
-          });
-        });
-      }
-    }
-  }
+    // Số lượng bài đăng cho mỗi ca
+    const postsPerSlot = Math.ceil(members.length / timeSlots.length);
+    
+    // Chọn ngẫu nhiên các thành viên cho ca này
+    const shuffledMembers = [...members].sort(() => Math.random() - 0.5);
+    const slotMembers = shuffledMembers.slice(0, postsPerSlot);
+    
+    // Phân bổ thời gian đều trong ca
+    slotMembers.forEach((member, index) => {
+      const timeSpacing = Math.floor(slotDuration / (slotMembers.length + 1));
+      const postTime = slotStart + timeSpacing * (index + 1);
+      
+      schedule.push({
+        member: member,
+        time: minutesToTime(postTime),
+        ca: slot.name
+      });
+    });
+  });
 
   // Sắp xếp lịch theo thời gian
   schedule.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
 
-  // Tạo bảng phân công
+  // Tạo và gửi bảng phân công
   const graph = `
     digraph G {
       node [shape=plaintext];
@@ -982,7 +965,7 @@ async function generateSchedule(bot, chatId) {
             <TD>Thời Gian</TD><TD>Thành Viên</TD><TD>Ca</TD>
           </TR>
           ${schedule.map(item => 
-            `<TR><TD>${item.time}</TD><TD>${item.member}</TD><TD>${item.shift}</TD></TR>`
+            `<TR><TD>${item.time}</TD><TD>${item.member}</TD><TD>${item.ca}</TD></TR>`
           ).join('')}
         </TABLE>
       >];
