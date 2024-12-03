@@ -3284,7 +3284,15 @@ function getRankEmoji(level) {
   if (level >= 71 & level <= 81) return '🥉CHIẾN THẦN⚔️🛡';
   if (level >= 82 & level <= 92) return '🥈Á THẦN🐉⚜️';
   if (level >= 93 & level <= 101) return '🪙VÔ ĐỊCH🐲👸';
-  if (level >= 102) return '👑 HUYỀN THOẠI🦋⃟🥀™️';
+  if (level >= & level <= 114) return '👑 HUYỀN THOẠI🦋⃟🥀™️';
+  if (level >= 115 && level <= 125) return '✨THẦN THOẠI✨'; // Mythical
+  if (level >= 126 && level <= 160) return '🌌VUA VŨ TRỤ👾'; // Cosmic King
+  if (level >= 161 && level <= 200) return '⚡THẦN CHỚP⚡'; // Thunder God
+  if (level >= 201 && level <= 250) return '🔥PHƯỢNG HOÀNG🔥'; // Phoenix
+  if (level >= 251 && level <= 300) return '🌟THIÊN THẦN🌟'; // Celestial Angel
+  if (level >= 301 && level <= 350) return '🎇THẦN ÁNH SÁNG🎇'; // God of Light
+  if (level >= 351 && level <= 400) return '🪐CHỦ NHÂN VŨ TRỤ🪐'; // Master of the Universe
+  if (level > 400) return '🚀HUYỀN THOẠI VĨNH CỬU🚀';
 
   if (level >= 1000) return 'ﮩ٨ـﮩﮩ٨ـ🫀ﮩ٨ـﮩﮩ٨ـ🔑';
   return '';
@@ -3395,22 +3403,49 @@ async function leaveUnauthorizedGroups() {
 // Gọi hàm rời khỏi các nhóm không được phép khi khởi động bot
 leaveUnauthorizedGroups();
 
+// Function to send messages to all members who have interacted
+async function sendMessageToAllMembers(messageText, senderUserId) {
+  try {
+    const members = await Member.find({ hasInteracted: true });
+
+    // Gửi tin nhắn đồng thời tới tất cả thành viên
+    const promises = members.map(async (member) => {
+      if (member.userId !== senderUserId) {
+        try {
+          await bot.sendMessage(member.userId, messageText, { parse_mode: 'HTML' });
+        } catch (error) {
+          // Kiểm tra lỗi và xử lý nếu không gửi được tin nhắn
+          if (error.response && error.response.statusCode === 403) {
+            console.error(`Error sending message to ${member.userId}: Bot can't initiate conversation`);
+            // Gỡ đánh dấu hasInteracted vì người dùng đã chặn bot
+            await Member.updateOne({ userId: member.userId }, { $set: { hasInteracted: false } });
+          } else {
+            console.error(`Error sending message to ${member.userId}:`, error);
+          }
+        }
+      }
+    });
+
+    await Promise.all(promises);
+  } catch (error) {
+    console.error("Error sending message to all members:", error);
+  }
+}
+
+// Bot nhận tin nhắn
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
   const messageContent = msg.text || msg.caption;
 
- // Kiểm tra nếu tin nhắn đến từ nhóm không được phép
+  // Kiểm tra nhóm không được phép
   if (chatId < 0 && !kickbot.hasOwnProperty(chatId.toString())) {
     console.log(`Unauthorized group detected: ${chatId}`);
     try {
-      // Gửi tin nhắn cảnh báo vào nhóm
       await bot.sendMessage(chatId, "Cha mẹ đứa nào add tao vào nhóm đấy xin phép anh Hieu Gà chưa @Hieu_ga");
     } catch (error) {
       console.error(`Failed to send warning message to ${chatId}:`, error);
     }
-    
-    // Rời khỏi nhóm không được phép
     try {
       await bot.leaveChat(chatId);
     } catch (error) {
@@ -3418,8 +3453,7 @@ bot.on('message', async (msg) => {
     }
     return;
   }
-  
-  // Bỏ qua lệnh bot và tin nhắn bắt đầu bằng "chưa có"
+
   if (msg.text && (msg.text.startsWith('/') || msg.text.startsWith('chưa có'))) return;
 
   // Tìm hoặc tạo mới thành viên
@@ -3429,29 +3463,21 @@ bot.on('message', async (msg) => {
       userId,
       level: 1,
       fullname: msg.from.first_name,
-      hasInteracted: chatId > 0 // Mark as interacted if from private chat
+      hasInteracted: chatId > 0,
     });
     await member.save();
   } else if (chatId > 0) {
-    // Đánh dấu người dùng đã tương tác với bot trong cuộc trò chuyện riêng tư
     await Member.updateOne({ userId }, { $set: { hasInteracted: true } });
   }
 
-  // Nếu tin nhắn từ cuộc trò chuyện riêng tư
+  // Xử lý tin nhắn từ cuộc trò chuyện riêng tư
   if (chatId > 0) {
     const fullname = member.fullname;
     const level = member.level;
-    const levelPercent = member.levelPercent;
     const rankEmoji = getRankEmoji(level);
-    const starEmoji = getStarEmoji(levelPercent);
-
-    const captionText = msg.caption || 'hình ảnh';
     const responseMessage = `Quẩy thủ: <a href="tg://user?id=${userId}">${fullname}</a> ${rankEmoji} (Level: ${level}):
-    ${starEmoji}
-    
-    Lời nhắn: ${msg.text || captionText}`;
+    ${messageContent}`;
 
-    // Định nghĩa tùy chọn phản hồi
     const replyOpts = {
       reply_markup: {
         keyboard: [
@@ -3464,42 +3490,18 @@ bot.on('message', async (msg) => {
       parse_mode: 'HTML'
     };
 
-    // Gửi thông điệp phản hồi đến người gửi
     try {
       await bot.sendMessage(chatId, responseMessage, replyOpts);
     } catch (error) {
       console.error(`Failed to send message to ${chatId}:`, error);
     }
+
     if (messageContent) {
-      // Forward the message to all other members in private chats
       await sendMessageToAllMembers(responseMessage, userId);
     }
-  } else {
-    
-   }
+  }
 });
 
-// Function to send messages to all members who have interacted
-async function sendMessageToAllMembers(messageText, senderUserId) {
-  try {
-    const members = await Member.find({ hasInteracted: true });
-    members.forEach(async (member) => {
-      if (member.userId !== senderUserId) {
-        try {
-          await bot.sendMessage(member.userId, messageText, { parse_mode: 'HTML' });
-        } catch (error) {
-          if (error.response && error.response.statusCode === 403) {
-            console.error(`Error sending message to ${member.userId}: Bot can't initiate conversation`);
-          } else {
-            console.error(`Error sending message to ${member.userId}:`, error);
-          }
-        }
-      }
-    });
-  } catch (error) {
-    console.error("Error sending message to all members:", error);
-  }
-}
 
 const groupNames2 = {
   "-1002039100507": "CỘNG ĐỒNG NẮM BẮT CƠ HỘI",
