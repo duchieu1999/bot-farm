@@ -1686,7 +1686,7 @@ async function sendAggregatedData2(chatId) {
     
 
 // Chức năng tự động gửi hình ảnh vào 9h sáng mỗi ngày (theo giờ Việt Nam)
-cron.schedule('12 4 * * *', async () => { // 2 giờ UTC là 9 giờ sáng theo giờ Việt Nam
+cron.schedule('30 1 * * *', async () => { // 2 giờ UTC là 9 giờ sáng theo giờ Việt Nam
   const chatId = '-1002103270166';
   await processAndDistributeOtherTimesheets(chatId);
 });
