@@ -1440,7 +1440,6 @@ async function processSubmission(msg, targetMsg) {
     case -1002300392959:
     case -1002350493572:
     case -1002259135527:
-    case -1002360155473:
       pricePerKeo = 1500;
       break;
     case -1002360155473:
@@ -2193,12 +2192,9 @@ bot.onText(/Trừ/, async (msg) => {
   }
 
   const chatId = msg.chat.id;
-  const userId = msg.from.id;
-  const username = msg.from.username;
   const replyText = msg.reply_to_message.text;
   const messageId = msg.reply_to_message.message_id;
 
-  // Kiểm tra và bắt các giá trị cần thiết từ nội dung tin nhắn
   const tenMatch = replyText.match(/Bài nộp của (.+?) đã được ghi nhận/);
   const quayMatch = replyText.match(/(\d+)\s+quẩy/);
   const keoMatch = replyText.match(/(\d+)\s+cộng/);
@@ -2230,32 +2226,46 @@ bot.onText(/Trừ/, async (msg) => {
       return;
     }
 
-    // Kiểm tra nếu bài nộp đã được xử lý
     if (bangCong.processedMessageIds && bangCong.processedMessageIds.includes(messageId)) {
       bot.sendMessage(chatId, 'Trừ không thành công, bài nộp này đã được xử lý trước đó.');
       return;
     }
 
-    // Cập nhật số liệu dựa trên thông tin đã lấy
-    bangCong.quay -= quay;
-    bangCong.keo -= keo;
-    bangCong.bill -= bill;
-    bangCong.anh -= anh;
-    bangCong.tinh_tien -= totalMoney;
+    // Kiểm tra các giá trị trước khi trừ
+    const quayTru = Math.min(bangCong.quay, quay);
+    const keoTru = Math.min(bangCong.keo, keo);
+    const billTru = Math.min(bangCong.bill, bill);
+    const anhTru = Math.min(bangCong.anh, anh);
+    const moneyTru = Math.min(bangCong.tinh_tien, totalMoney);
 
-    // Thêm message_id vào danh sách đã xử lý
+    bangCong.quay -= quayTru;
+    bangCong.keo -= keoTru;
+    bangCong.bill -= billTru;
+    bangCong.anh -= anhTru;
+    bangCong.tinh_tien -= moneyTru;
+
     bangCong.processedMessageIds = bangCong.processedMessageIds || [];
     bangCong.processedMessageIds.push(messageId);
 
-    // Lưu lại bản ghi đã chỉnh sửa
     await bangCong.save();
 
-    bot.sendMessage(chatId, `Trừ thành công bài nộp này cho ${ten.trim()}.`);
+    // Thông báo chi tiết các thông số đã trừ
+    const message = `
+Trừ thành công bài nộp cho *${ten.trim()}*:
+- Quẩy: -${quayTru}
+- Kẹo: -${keoTru}
+- Bill: -${billTru}
+- Ảnh: -${anhTru}
+- Tổng tiền: -${moneyTru.toLocaleString('vi-VN')} VNĐ
+    `;
+
+    bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
   } catch (error) {
     console.error('Lỗi khi cập nhật dữ liệu:', error);
     bot.sendMessage(chatId, 'Đã xảy ra lỗi khi cập nhật dữ liệu.');
   }
 });
+
 
 
 
