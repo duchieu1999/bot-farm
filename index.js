@@ -3298,7 +3298,7 @@ function getRankEmoji(level) {
   if (level >= 71 && level <= 81) return '🥉CHIẾN THẦN⚔️🛡';
   if (level >= 82 && level <= 92) return '🥈Á THẦN🐉⚜️';
   if (level >= 93 && level <= 101) return '🪙VÔ ĐỊCH🐲👸';
-  if (level >= && level <= 114) return '👑 HUYỀN THOẠI🦋⃟🥀™️';
+  if (level >= 102 && level <= 114) return '👑 HUYỀN THOẠI🦋⃟🥀™️';
   if (level >= 115 && level <= 125) return '✨THẦN THOẠI✨'; // Mythical
   if (level >= 126 && level <= 160) return '🌌VUA VŨ TRỤ👾'; // Cosmic King
   if (level >= 161 && level <= 200) return '⚡THẦN CHỚP⚡'; // Thunder God
