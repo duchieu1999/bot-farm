@@ -2192,9 +2192,15 @@ bot.onText(/Trừ/, async (msg) => {
   }
 
   const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const username = msg.from.username;
   const replyText = msg.reply_to_message.text;
   const messageId = msg.reply_to_message.message_id;
 
+  console.log('Starting subtraction process for message:', messageId);
+  console.log('Reply text:', replyText);
+
+  // Kiểm tra và bắt các giá trị cần thiết từ nội dung tin nhắn
   const tenMatch = replyText.match(/Bài nộp của (.+?) đã được ghi nhận/);
   const quayMatch = replyText.match(/(\d+)\s+quẩy/);
   const keoMatch = replyText.match(/(\d+)\s+cộng/);
@@ -2204,6 +2210,14 @@ bot.onText(/Trừ/, async (msg) => {
 
   if (!tenMatch || !quayMatch || !keoMatch || !billMatch || !anhMatch || !totalMoneyMatch) {
     bot.sendMessage(chatId, 'Tin nhắn trả lời không đúng định dạng xác nhận của bot.');
+    console.log('Format validation failed', {
+      tenMatch,
+      quayMatch,
+      keoMatch,
+      billMatch,
+      anhMatch,
+      totalMoneyMatch
+    });
     return;
   }
 
@@ -2214,55 +2228,107 @@ bot.onText(/Trừ/, async (msg) => {
   const anh = parseInt(anhMatch[1]);
   const totalMoney = parseInt(totalMoneyMatch[1].replace(/,/g, ''));
 
+  console.log('Parsed values:', { ten, quay, keo, bill, anh, totalMoney });
+
   try {
     const regex = new RegExp(normalizeName(ten).split('').join('.*'), 'i');
-    const bangCong = await BangCong2.findOne({
+    console.log('Searching with regex:', regex);
+
+    // Lấy dữ liệu hiện tại trước khi cập nhật
+    const currentData = await BangCong2.findOne({
       groupId: chatId,
       ten: { $regex: regex },
     });
 
-    if (!bangCong) {
+    if (!currentData) {
       bot.sendMessage(chatId, `Không tìm thấy bản ghi để cập nhật cho ${ten.trim()}.`);
+      console.log('Record not found for:', ten);
       return;
     }
 
-    if (bangCong.processedMessageIds && bangCong.processedMessageIds.includes(messageId)) {
+    console.log('Current data before update:', currentData);
+
+    // Kiểm tra nếu bài nộp đã được xử lý
+    if (currentData.processedMessageIds && currentData.processedMessageIds.includes(messageId)) {
       bot.sendMessage(chatId, 'Trừ không thành công, bài nộp này đã được xử lý trước đó.');
+      console.log('Message already processed:', messageId);
       return;
     }
 
-    // Kiểm tra các giá trị trước khi trừ
-    const quayTru = Math.min(bangCong.quay, quay);
-    const keoTru = Math.min(bangCong.keo, keo);
-    const billTru = Math.min(bangCong.bill, bill);
-    const anhTru = Math.min(bangCong.anh, anh);
-    const moneyTru = Math.min(bangCong.tinh_tien, totalMoney);
+    // Kiểm tra giá trị âm trước khi cập nhật
+    const newQuay = currentData.quay - quay;
+    const newKeo = currentData.keo - keo;
+    const newBill = currentData.bill - bill;
+    const newAnh = currentData.anh - anh;
+    const newTinhTien = currentData.tinh_tien - totalMoney;
 
-    bangCong.quay -= quayTru;
-    bangCong.keo -= keoTru;
-    bangCong.bill -= billTru;
-    bangCong.anh -= anhTru;
-    bangCong.tinh_tien -= moneyTru;
+    if (newQuay < 0 || newKeo < 0 || newBill < 0 || newAnh < 0) {
+      bot.sendMessage(chatId, 'Trừ không thành công, số lượng trừ lớn hơn số hiện có.');
+      console.log('Negative values detected:', { newQuay, newKeo, newBill, newAnh });
+      return;
+    }
 
-    bangCong.processedMessageIds = bangCong.processedMessageIds || [];
-    bangCong.processedMessageIds.push(messageId);
+    // Thực hiện cập nhật với $inc để đảm bảo atomic operation
+    const updateResult = await BangCong2.findOneAndUpdate(
+      {
+        groupId: chatId,
+        ten: { $regex: regex },
+        $or: [
+          { processedMessageIds: { $exists: false } },
+          { processedMessageIds: { $nin: [messageId] } }
+        ]
+      },
+      {
+        $inc: {
+          quay: -quay,
+          keo: -keo,
+          bill: -bill,
+          anh: -anh,
+          tinh_tien: -totalMoney
+        },
+        $push: { processedMessageIds: messageId }
+      },
+      { new: true }
+    );
 
-    await bangCong.save();
+    if (!updateResult) {
+      bot.sendMessage(chatId, 'Trừ không thành công, có lỗi khi cập nhật dữ liệu.');
+      console.log('Update failed:', updateResult);
+      return;
+    }
 
-    // Thông báo chi tiết các thông số đã trừ
-    const message = `
-Trừ thành công bài nộp cho *${ten.trim()}*:
-- Quẩy: -${quayTru}
-- Kẹo: -${keoTru}
-- Bill: -${billTru}
-- Ảnh: -${anhTru}
-- Tổng tiền: -${moneyTru.toLocaleString('vi-VN')} VNĐ
-    `;
+    console.log('Update result:', updateResult);
 
-    bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+    // Verify the update
+    const verifyData = await BangCong2.findOne({
+      groupId: chatId,
+      ten: { $regex: regex },
+    });
+
+    console.log('Data after update:', verifyData);
+
+    if (
+      verifyData.quay === newQuay &&
+      verifyData.keo === newKeo &&
+      verifyData.bill === newBill &&
+      verifyData.anh === newAnh &&
+      verifyData.tinh_tien === newTinhTien
+    ) {
+      bot.sendMessage(
+        chatId,
+        `Trừ thành công bài nộp cho ${ten.trim()}.\nSố liệu hiện tại:\nQuẩy: ${verifyData.quay}\nCộng: ${verifyData.keo}\nBill: ${verifyData.bill}\nẢnh: ${verifyData.anh}\nTổng tiền: ${verifyData.tinh_tien.toLocaleString()} VNĐ`
+      );
+    } else {
+      bot.sendMessage(chatId, 'Phát hiện không khớp dữ liệu sau khi cập nhật. Vui lòng kiểm tra lại.');
+      console.log('Data verification failed', {
+        expected: { newQuay, newKeo, newBill, newAnh, newTinhTien },
+        actual: verifyData
+      });
+    }
+
   } catch (error) {
-    console.error('Lỗi khi cập nhật dữ liệu:', error);
-    bot.sendMessage(chatId, 'Đã xảy ra lỗi khi cập nhật dữ liệu.');
+    console.error('Detailed error:', error);
+    bot.sendMessage(chatId, 'Đã xảy ra lỗi khi cập nhật dữ liệu. Vui lòng thử lại sau.');
   }
 });
 
