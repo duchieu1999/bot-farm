@@ -185,23 +185,6 @@ function loadFiles() {
 // Gọi hàm để tải tất cả các file
 loadFiles();
 
-
-// Đảm bảo xóa webhook trước khi polling
-(async () => {
-  try {
-    const webhookInfo = await bot.getWebhookInfo();
-    if (webhookInfo.url) {
-      console.log(`Webhook hiện tại: ${webhookInfo.url}. Đang xóa webhook...`);
-      await bot.deleteWebhook();
-      console.log('Webhook đã được xóa.');
-    } else {
-      console.log('Không có webhook nào đang hoạt động.');
-    }
-  } catch (error) {
-    console.error('Lỗi khi kiểm tra hoặc xóa webhook:', error);
-  }
-})();
-
 // Chuỗi cấmm
 const bannedStringsRegex = /(ca\s?1|ca1|ca\s?2|Ca\s?2|Ca\s?1|Ca1|Ca\s?2|Ca2|C1|C2|c\s?1|c\s?2|C\s?1|C\s?2)\s*/gi;
 
@@ -2340,7 +2323,7 @@ let upBillMembers = [];
 let isWaitingForBills = false;
 let currentCa = '';
 
-schedule.scheduleJob('33 5 * * *', async () => {
+schedule.scheduleJob('38 5 * * *', async () => {
   try {
     await Attendance.deleteMany({});
     await BillHistory.deleteMany({ date: { $lt: new Date() } });
