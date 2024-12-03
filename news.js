@@ -1,4 +1,5 @@
 const RSSParser = require('rss-parser');
+const schedule = require('node-schedule');
 
 const parser = new RSSParser();
 
