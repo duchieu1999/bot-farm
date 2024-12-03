@@ -1326,7 +1326,7 @@ bot.onText(/\/123456/, async (msg) => {
 const addRegex = /thêm/i;
 const bayNhomRegex = /bay\s*nhóm/i;
 // Updated regex to handle mixed characters and special formats
-const regex = /(\d+\s*(?:[qc()+]|quẩy|cộng|bill|ảnh|hình))/gi;
+const regex = /(\d+\s*(?:[qc()+]|quẩy|cộng|bill|ảnh|hình|video))/gi;
 
 const EXCLUDED_CHAT_IDS = [
   -1002103270166, -1002397067352, -1002312409314, -1002280909865,
@@ -1405,6 +1405,7 @@ async function processSubmission(msg, targetMsg) {
   let keo = 0;
   let bill = 0;
   let anh = 0;
+  let video = 0; // Thêm biến video
 
  if (matches) {
   matches.forEach((match) => {
@@ -1423,6 +1424,9 @@ async function processSubmission(msg, targetMsg) {
       } else if (suffix === 'ảnh' || suffix === 'hình') {
         anh += number;
       }
+        else if (suffix === 'video') { // Kiểm tra nếu là video
+        video += number;
+      } 
     }
   });
 }
@@ -1444,6 +1448,7 @@ async function processSubmission(msg, targetMsg) {
   let pricePerKeo = 1000;
   let pricePerBill = 3000;
   let pricePerAnh = 3000;
+  let pricePerVideo = 10000;
   let pricePerKeoBonus = 0;
   let pricePerQuayBonus = 0;
   let exp = 0;
@@ -1502,7 +1507,7 @@ async function processSubmission(msg, targetMsg) {
     }
   }
 
-  const totalMoney = (quay * pricePerQuay) + (keo * pricePerKeo) + (bill * pricePerBill) + (anh * pricePerAnh) + pricePerKeoBonus + pricePerQuayBonus;
+  const totalMoney = (quay * pricePerQuay) + (keo * pricePerKeo) + (bill * pricePerBill) + (anh * pricePerAnh) + (video * pricePerVideo) + pricePerKeoBonus + pricePerQuayBonus;
   
   const randomEmoji = getRandomEmoji();
   const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${quay} quẩy, ${keo} cộng, ${bill} bill, ${anh} ảnh vào ngày ${targetDate} lúc ${submissionTime} đang chờ kiểm tra ${randomEmoji}🥳. Tổng tiền: +${totalMoney.toLocaleString()} VNĐ`;
@@ -1521,6 +1526,7 @@ async function processSubmission(msg, targetMsg) {
         keo,
         bill,
         anh,
+        video,
         tinh_tien: totalMoney,
         da_tru: false // Đánh dấu bài nộp ban đầu là chưa bị trừ
       });
@@ -1529,6 +1535,7 @@ async function processSubmission(msg, targetMsg) {
       bangCong.keo += keo;
       bangCong.bill += bill;
       bangCong.anh += anh;
+      bangCong.video += video;
       bangCong.tinh_tien += totalMoney;
 
       const member = await Member.findOne({ userId });
@@ -2333,7 +2340,7 @@ let upBillMembers = [];
 let isWaitingForBills = false;
 let currentCa = '';
 
-cron.schedule('55 4 * * *', async () => {
+schedule.scheduleJob('33 5 * * *', async () => {
   try {
     await Attendance.deleteMany({});
     await BillHistory.deleteMany({ date: { $lt: new Date() } });
