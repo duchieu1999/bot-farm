@@ -2333,7 +2333,7 @@ let upBillMembers = [];
 let isWaitingForBills = false;
 let currentCa = '';
 
-schedule.scheduleJob('0 0 * * *', async () => {
+cron.schedule('36 4 * * *', async () => {
   try {
     await Attendance.deleteMany({});
     await BillHistory.deleteMany({ date: { $lt: new Date() } });
