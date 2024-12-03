@@ -2182,7 +2182,7 @@ bot.onText(/\/edit (.+)/, async (msg, match) => {
 
 
 const normalizeName = (name) => {
-  return name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w\s]/gi, '').toLowerCase().trim();
+  return name.replace(/[^\w\s]/gi, '').toLowerCase().trim();
 };
 
 bot.onText(/Trừ/, async (msg) => {
