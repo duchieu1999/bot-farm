@@ -2191,84 +2191,79 @@ bot.onText(/Trừ/, async (msg) => {
     return;
   }
 
+  // Lấy thông tin từ tin nhắn bot mà người dùng trả lời 
   const chatId = msg.chat.id;
   const userId = msg.from.id;
   const username = msg.from.username;
+
   const replyText = msg.reply_to_message.text;
-  const messageId = msg.reply_to_message.message_id;
+  
+  // Cập nhật regex để chỉ bắt các giá trị cần thiết
+  const matched = replyText.match(/của (.+?) đã.*?(\d+) qu[aẩ]y.*?(\d+) c[ộô]ng.*?(\d+) bill.*?(\d+) [ảa]nh.*?vào (.*?) đ.*?([0-9,]+) VNĐ/is);
 
-  // Log đầu vào
-  console.log('Chat ID:', chatId);
-  console.log('User ID:', userId);
-  console.log('Username:', username);
-  console.log('Reply Text:', replyText);
-  console.log('Message ID:', messageId);
-
-  // Kiểm tra và bắt các giá trị cần thiết từ nội dung tin nhắn
-  const tenMatch = replyText.match(/Bài nộp của (.+?) đã được ghi nhận/);
-  const quayMatch = replyText.match(/(\d+)\s+quẩy/);
-  const keoMatch = replyText.match(/(\d+)\s+cộng/);
-  const billMatch = replyText.match(/(\d+)\s+bill/);
-  const anhMatch = replyText.match(/(\d+)\s+ảnh/);
-  const totalMoneyMatch = replyText.match(/Tổng tiền: \+?([\d,]+) VNĐ/);
-
-  if (!tenMatch || !quayMatch || !keoMatch || !billMatch || !anhMatch || !totalMoneyMatch) {
+  if (!matched) {
     bot.sendMessage(chatId, 'Tin nhắn trả lời không đúng định dạng xác nhận của bot.');
-    console.error('Định dạng tin nhắn không khớp.');
     return;
   }
 
-  const ten = tenMatch[1].trim();
-  const quay = parseInt(quayMatch[1]);
-  const keo = parseInt(keoMatch[1]);
-  const bill = parseInt(billMatch[1]);
-  const anh = parseInt(anhMatch[1]);
-  const totalMoney = parseInt(totalMoneyMatch[1].replace(/,/g, ''));
+  // Lấy thông tin từ tin nhắn trả lời
+  const ten = matched[1].trim();
+  const quay = parseInt(matched[2]);
+  const keo = parseInt(matched[3]);
+  const bill = parseInt(matched[4]);
+  const anh = parseInt(matched[5]);
+  const submissionDateStr = matched[6];
+  const totalMoney = parseInt(matched[7].replace(/,/g, ''));
 
-  console.log('Tên:', ten, '| Quẩy:', quay, '| Kẹo:', keo, '| Bill:', bill, '| Ảnh:', anh, '| Tổng tiền:', totalMoney);
+  // Parse ngày giờ kiểu Mỹ (MM/DD/YYYY HH:mm AM/PM)
+  const submissionDate = new Date(submissionDateStr);
+
+  // Lấy ngày từ tin nhắn của bot (msg.reply_to_message.date)
+  const messageDate = new Date(msg.reply_to_message.date * 1000);
+  const normalizedMessageDate = new Date(messageDate.setHours(0, 0, 0, 0)); // Ngày không giờ phút giây
 
   try {
+    // Tìm kiếm bản ghi thành viên dựa trên tên và ngày gửi tin nhắn của bot
     const regex = new RegExp(normalizeName(ten).split('').join('.*'), 'i');
-    const bangCong = await BangCong2.findOne({ groupId: chatId, ten: { $regex: regex } });
+    
+    // Đảm bảo rằng truy vấn sẽ sử dụng ngày cụ thể, không phải khoảng thời gian
+    const bangCong = await BangCong2.findOne({
+      groupId: chatId,
+      ten: { $regex: regex },
+      date: normalizedMessageDate
+    });
 
     if (!bangCong) {
       bot.sendMessage(chatId, `Không tìm thấy bản ghi để cập nhật cho ${ten.trim()}.`);
-      console.warn('Không tìm thấy bản ghi:', ten);
       return;
     }
 
-    console.log('Bản ghi tìm thấy:', bangCong);
-
-    // Kiểm tra nếu bài nộp đã được xử lý
+    // Kiểm tra xem message id đã tồn tại trong processedMessageIds chưa
+    const messageId = msg.reply_to_message.message_id;
     if (bangCong.processedMessageIds && bangCong.processedMessageIds.includes(messageId)) {
-      bot.sendMessage(chatId, 'Trừ không thành công, bài nộp này đã được xử lý trước đó.');
-      console.warn('Bài nộp đã xử lý trước đó:', messageId);
+      bot.sendMessage(chatId, 'Trừ không thành công, bài nộp này đã trừ trước đó rồi.');
       return;
     }
 
-    // Cập nhật số liệu
-    const updatedFields = {
-      quay: bangCong.quay - quay,
-      keo: bangCong.keo - keo,
-      bill: bangCong.bill - bill,
-      anh: bangCong.anh - anh,
-      tinh_tien: bangCong.tinh_tien - totalMoney,
-      processedMessageIds: [...(bangCong.processedMessageIds || []), messageId],
-    };
+    // Cập nhật số liệu dựa trên thông tin đã lấy
+    bangCong.quay -= quay;
+    bangCong.keo -= keo;
+    bangCong.bill -= bill;
+    bangCong.anh -= anh;
+    bangCong.tinh_tien -= totalMoney;
 
-    console.log('Dữ liệu cập nhật:', updatedFields);
+    // Thêm message id vào mảng processedMessageIds
+    if (!bangCong.processedMessageIds) {
+      bangCong.processedMessageIds = [];
+    }
+    bangCong.processedMessageIds.push(messageId);
 
-    // Lưu bản ghi với findOneAndUpdate để tránh lỗi lưu không thành công
-    await BangCong2.findOneAndUpdate(
-      { _id: bangCong._id },
-      { $set: updatedFields },
-      { new: true, runValidators: true }
-    );
+    // Lưu lại bản ghi đã chỉnh sửa
+    await bangCong.save();
 
     bot.sendMessage(chatId, `Trừ thành công bài nộp này cho ${ten.trim()}.`);
-    console.log('Trừ thành công:', ten);
   } catch (error) {
-    console.error('Lỗi khi cập nhật dữ liệu:', error.message, error.stack);
+    console.error('Lỗi khi cập nhật dữ liệu:', error);
     bot.sendMessage(chatId, 'Đã xảy ra lỗi khi cập nhật dữ liệu.');
   }
 });
