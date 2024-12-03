@@ -1686,7 +1686,7 @@ async function sendAggregatedData2(chatId) {
     
 
 // Chức năng tự động gửi hình ảnh vào 9h sáng mỗi ngày (theo giờ Việt Nam)
-schedule.scheduleJob('10 9 * * *', async () => { // 2 giờ UTC là 9 giờ sáng theo giờ Việt Nam
+cron.schedule('8 4 * * *', async () => { // 2 giờ UTC là 9 giờ sáng theo giờ Việt Nam
   const chatId = '-1002103270166';
   await processAndDistributeOtherTimesheets(chatId);
 });
@@ -3295,10 +3295,10 @@ function getRankEmoji(level) {
   if (level >= 60 && level <= 64) return '🪩VIP🪩';
   if (level >= 65 && level <= 67) return '🩻VIP🩻';
   if (level >= 68 && level <= 70) return '🪬VIP🪬୧⍤⃝💐';
-  if (level >= 71 & level <= 81) return '🥉CHIẾN THẦN⚔️🛡';
-  if (level >= 82 & level <= 92) return '🥈Á THẦN🐉⚜️';
-  if (level >= 93 & level <= 101) return '🪙VÔ ĐỊCH🐲👸';
-  if (level >= & level <= 114) return '👑 HUYỀN THOẠI🦋⃟🥀™️';
+  if (level >= 71 && level <= 81) return '🥉CHIẾN THẦN⚔️🛡';
+  if (level >= 82 && level <= 92) return '🥈Á THẦN🐉⚜️';
+  if (level >= 93 && level <= 101) return '🪙VÔ ĐỊCH🐲👸';
+  if (level >= && level <= 114) return '👑 HUYỀN THOẠI🦋⃟🥀™️';
   if (level >= 115 && level <= 125) return '✨THẦN THOẠI✨'; // Mythical
   if (level >= 126 && level <= 160) return '🌌VUA VŨ TRỤ👾'; // Cosmic King
   if (level >= 161 && level <= 200) return '⚡THẦN CHỚP⚡'; // Thunder God
