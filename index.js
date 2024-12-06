@@ -785,7 +785,7 @@ async function generateReport(bot, chatId, days) {
   const dailyImages = [];
 
   for (const dateStr of dates) {
-    const bangCongList = await Trasua.find({ groupId: -1002496228650, date: dateStr });
+    const bangCongList = await Trasua.find({ groupId: -1002280909865, date: dateStr });
 
     if (bangCongList.length === 0) {
       bot.sendMessage(chatId, `Chưa có bảng công nào được ghi nhận trong ngày ${dateStr}.`);
