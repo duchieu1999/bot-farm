@@ -505,7 +505,7 @@ bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
 
   // Chỉ xử lý tin nhắn trong nhóm cụ thể
-  if (chatId == -1002280909865) {
+  if (chatId == -1002496228650) {
     const messageContent = msg.text || msg.caption;
     if (messageContent) {
       // Kiểm tra nếu tin nhắn chứa từ "bỏ"
@@ -785,7 +785,7 @@ async function generateReport(bot, chatId, days) {
   const dailyImages = [];
 
   for (const dateStr of dates) {
-    const bangCongList = await Trasua.find({ groupId: -1002280909865, date: dateStr });
+    const bangCongList = await Trasua.find({ groupId: -1002496228650, date: dateStr });
 
     if (bangCongList.length === 0) {
       bot.sendMessage(chatId, `Chưa có bảng công nào được ghi nhận trong ngày ${dateStr}.`);
@@ -895,7 +895,7 @@ async function generateSchedule(bot, chatId) {
   const yesterdayStr = yesterday.toLocaleDateString();
 
   // Lấy bảng công của ngày hôm qua
-  const bangCongList = await Trasua.find({ groupId: -1002280909865, date: yesterdayStr });
+  const bangCongList = await Trasua.find({ groupId: -1002496228650, date: yesterdayStr });
 
   if (bangCongList.length === 0) {
     return bot.sendMessage(chatId, `Không tìm thấy bảng công của ngày ${yesterdayStr}.`);
@@ -997,7 +997,7 @@ const timeRanges = [
   const imageUrl = `${url}${encodeURIComponent(graph)}`;
   
   // Gửi ảnh vào group với message_thread_id
-  await bot.sendPhoto(-1002280909865, imageUrl, {
+  await bot.sendPhoto(-1002496228650, imageUrl, {
     caption: `Lịch Đăng Bài Ngày ${today.toLocaleDateString()}`,
     message_thread_id: 42
   });
@@ -1007,7 +1007,7 @@ const timeRanges = [
 cron.schedule('0 9 * * *', async () => {
   try {
     console.log('Đang tạo và gửi lịch đăng bài tự động...');
-    await generateSchedule(bot, -1002280909865); // Gọi trực tiếp với groupId
+    await generateSchedule(bot, -1002496228650); // Gọi trực tiếp với groupId
     console.log('Đã gửi lịch đăng bài thành công!');
   } catch (error) {
     console.error('Lỗi khi gửi lịch đăng bài tự động:', error);
@@ -1029,7 +1029,7 @@ bot.onText(/\/dangbai/, async (msg) => {
 
 
 // ID của nhóm và thread
-const groupId44 = -1002280909865;
+const groupId44 = -1002496228650;
 const topicId44 = 10;
 
 // Lắng nghe lệnh /chaonha
@@ -1312,7 +1312,7 @@ const bayNhomRegex = /bay\s*nhóm/i;
 const regex = /(\d+\s*(?:[qc()+]|quẩy|cộng|bill|ảnh|hình|video))/gi;
 
 const EXCLUDED_CHAT_IDS = [
-  -1002103270166, -1002397067352, -1002312409314, -1002280909865,
+  -1002103270166, -1002397067352, -1002312409314, -1002496228650,
   -1002336524767, -1002295387259, -1002128975957, -1002322022623,
   -1002247863313, -1002192201870, -1002499533124,
   -1002303292016, -1002128975957
@@ -1993,6 +1993,7 @@ const kickbot = {
   "-1002457468797": "dososo",
   "-1002383656659": "idodw", 
   "-1002333438294": "erefeff",
+  "-1002496228650": "djfdkf",
   "-1002123430691": "DẪN LỐI THÀNH CÔNG",
   "-1002143712364": "CÙNG NHAU CHIA SẺ",
   "-1002246062598": "guyi",
@@ -2005,7 +2006,6 @@ const kickbot = {
   "-1002129896837": "GROUP I MẠNH ĐỨC CHIA SẺ", 
   "-1002228252389": "ORMARKET community",
   "-1002103270166": "Tổng bank",
-  "-1002280909865": "nhom5k",
   "-1002128289933": "test",
   "-1002479414582": "ei292", 
   "-1002499533124": "ekfrek",
@@ -2313,7 +2313,7 @@ const timeSlots = [
   { time: '19:30', label: 'ca 20h00' }
 ];
 
-const groupId = -1002280909865;
+const groupId = -1002496228650;
 const adminIds = [7305842707];
 const topicId = 10;
 
