@@ -25,7 +25,7 @@ module.exports = (bot) => {
         const groupNames = {
             "-1002247863313": "NHÓM HÀ QUẨY ZALO BIN:",
             "-1002303292016": "NHÓM HÀ 11H30, 19H30:",
-            "-1002499533124": "NHÓM HÀ PANLEN:"
+            "-1002499533124": "NHÓM HÀ PANLEN:",
             "-1002322022623": "NHÓM HÀ:"
         };
 
