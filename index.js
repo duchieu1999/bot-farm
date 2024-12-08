@@ -4420,3 +4420,37 @@ bot.on('message', async (msg) => {
     }
   }
 });
+
+const spamKeywords = [
+  "lừa đảo", "chó", "dmm", "lồn", "lừa", "bịp", "campuchia", "bọn điên",
+  "súc vật", "vl", "cút", "dm", "vkl", "mày", "dốt", "chết", "khốn nạn"
+];
+
+// Hàm kiểm tra từ khóa spam
+function containsSpamKeywords(messageContent) {
+  const lowerCaseMessage = messageContent.toLowerCase();
+  return spamKeywords.some((keyword) => lowerCaseMessage.includes(keyword));
+}
+
+bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
+  const messageContent = msg.text || msg.caption; // Xử lý cả text và caption (nếu là ảnh/video)
+
+  if (messageContent && containsSpamKeywords(messageContent)) {
+    const userId = msg.from.id;
+    const username = msg.from.username || msg.from.first_name || "người dùng";
+
+    try {
+      // Xóa tin nhắn chứa từ khóa spam
+      await bot.deleteMessage(chatId, msg.message_id);
+
+      // Kick người dùng ra khỏi nhóm
+      await bot.kickChatMember(chatId, userId);
+
+     
+    } catch (error) {
+      console.error("Lỗi khi xử lý tin nhắn spam:", error);
+    }
+  }
+});
+
