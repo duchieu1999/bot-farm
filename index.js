@@ -1469,30 +1469,28 @@ async function processSubmission(msg, targetMsg) {
   let anh = 0;
   let video = 0; // Thêm biến video
 
- if (matches) {
-  matches.forEach((match) => {
-    const numberMatch = match.match(/\d+/); // Lấy số từ match
-    const suffix = match.replace(/\d+\s*/, '').toLowerCase(); // Lấy từ loại
+  if (matches) {
+    matches.forEach((match) => {
+      const numberMatch = match.match(/\d+/); // Lấy số từ match
+      const suffix = match.replace(/\d+\s*/, '').toLowerCase(); // Lấy từ loại
 
-    if (numberMatch) { // Đảm bảo có số trong match
-      const number = parseInt(numberMatch[0]);
+      if (numberMatch) { // Đảm bảo có số trong match
+        const number = parseInt(numberMatch[0]);
 
-      if (suffix === 'q' || suffix === 'quẩy') {
-        quay += number;
-      } else if (suffix === 'c' || suffix === 'cộng' || suffix === '+') {
-        keo += number;
-      } else if (suffix === 'bill') {
-        bill += number;
-      } else if (suffix === 'ảnh' || suffix === 'hình') {
-        anh += number;
+        if (suffix === 'q' || suffix === 'quẩy') {
+          quay += number;
+        } else if (suffix === 'c' || suffix === 'cộng' || suffix === '+') {
+          keo += number;
+        } else if (suffix === 'bill') {
+          bill += number;
+        } else if (suffix === 'ảnh' || suffix === 'hình') {
+          anh += number;
+        } else if (suffix === 'video') { // Kiểm tra nếu là video
+          video += number;
+        }
       }
-        else if (suffix === 'video') { // Kiểm tra nếu là video
-        video += number;
-      } 
-    }
-  });
-}
-
+    });
+  }
 
   const targetDate = new Date(targetMsg.date * 1000).toLocaleDateString();
   const submissionTime = new Date(targetMsg.date * 1000).toLocaleTimeString();
@@ -1500,20 +1498,12 @@ async function processSubmission(msg, targetMsg) {
   const lastName = targetMsg.from.last_name;
   const fullName = lastName ? `${firstName} ${lastName}` : firstName;
 
-  const vipCard = await VipCard.findOne({
-    userId,
-    validFrom: { $lte: new Date() },
-    validUntil: { $gte: new Date() }
-  });
-
+  // Xác định giá dựa trên groupId
   let pricePerQuay = 500;
   let pricePerKeo = 1000;
   let pricePerBill = 3000;
   let pricePerAnh = 3000;
   let pricePerVideo = 10000;
-  let pricePerKeoBonus = 0;
-  let pricePerQuayBonus = 0;
-  let exp = 0;
 
   // Tính giá keo dựa trên groupId
   switch (groupId) {
@@ -1546,31 +1536,11 @@ async function processSubmission(msg, targetMsg) {
       break;   
     default:
       pricePerKeo = 1000;
+      pricePerQuay = 500;
   }
 
-  if (vipCard) {
-    if (vipCard.type === 'r3932') {
-      pricePerQuay = 0;
-      pricePerKeo += 0;
-    } else if (vipCard.type === '4827' || vipCard.type === 'monnth') {
-      pricePerQuay = 0;
-      pricePerKeo += 0;
-      exp = vipCard.expBonus;
-    }
+  const totalMoney = (quay * pricePerQuay) + (keo * pricePerKeo) + (bill * pricePerBill) + (anh * pricePerAnh) + (video * pricePerVideo);
 
-    if (vipCard.keoLimit && keo > vipCard.keoLimit) {
-      const remainingKeo = keo - vipCard.keoLimit;
-      pricePerKeoBonus = remainingKeo * 0;
-    }
-
-    if (vipCard.quayLimit && quay > vipCard.quayLimit) {
-      const remainingQuay = quay - vipCard.quayLimit;
-      pricePerQuayBonus = remainingQuay * 0;
-    }
-  }
-
-  const totalMoney = (quay * pricePerQuay) + (keo * pricePerKeo) + (bill * pricePerBill) + (anh * pricePerAnh) + (video * pricePerVideo) + pricePerKeoBonus + pricePerQuayBonus;
-  
   const randomEmoji = getRandomEmoji();
   const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${quay} quẩy, ${keo} cộng, ${bill} bill, ${anh} ảnh vào ngày ${targetDate} lúc ${submissionTime} đang chờ kiểm tra ${randomEmoji}🥳. Tổng tiền: +${totalMoney.toLocaleString()} VNĐ`;
 
@@ -1601,7 +1571,7 @@ async function processSubmission(msg, targetMsg) {
       bangCong.tinh_tien += totalMoney;
 
       const member = await Member.findOne({ userId });
-      member.exp += exp;
+      member.exp += Math.floor(totalMoney / 500); // Thêm exp dựa trên số tiền
 
       if (exp > 0) {
         member.levelPercent += Math.floor(exp / 10);
@@ -1615,6 +1585,7 @@ async function processSubmission(msg, targetMsg) {
     await updateMissionProgress(userId);
   });
 }
+
 
 
 
