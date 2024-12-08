@@ -1571,15 +1571,21 @@ async function processSubmission(msg, targetMsg) {
       bangCong.tinh_tien += totalMoney;
 
       const member = await Member.findOne({ userId });
-      member.exp += Math.floor(totalMoney / 500); // Thêm exp dựa trên số tiền
+      if (member) {
+      // Tính exp giảm dần dựa trên levelPercent
+      const baseExp = Math.floor(totalMoney / 200); // Exp cơ bản
+      const reductionFactor = 1 - Math.log(1 + member.levelPercent) / Math.log(101); // Giảm dần chậm hơn
+      const adjustedExp = Math.floor(baseExp * reductionFactor);
 
-      if (exp > 0) {
-        member.levelPercent += Math.floor(exp / 10);
-      }
+      member.exp += adjustedExp;
 
-      await bangCong.save();
+      // Cập nhật levelPercent dựa trên exp
+      member.levelPercent += Math.floor(adjustedExp / 10);
       await member.save();
     }
+
+    await bangCong.save();
+  }
 
     await updateLevelPercent(userId);
     await updateMissionProgress(userId);
