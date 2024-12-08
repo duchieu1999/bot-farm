@@ -1571,21 +1571,28 @@ async function processSubmission(msg, targetMsg) {
       bangCong.tinh_tien += totalMoney;
 
       const member = await Member.findOne({ userId });
-      if (member) {
-      // Tính exp giảm dần dựa trên levelPercent
-      const baseExp = Math.floor(totalMoney / 300); // Exp cơ bản
-      const reductionFactor = Math.max(0.1, 1 - member.levelPercent / 100); // Giảm từ 1 (100%) xuống 0.1 (10%)
-      const adjustedExp = Math.floor(baseExp * reductionFactor);
+      // Tính toán hệ số giảm exp dựa trên levelPercent
+      let expMultiplier = 1;
+      if (member.levelPercent >= 100) {
+        expMultiplier = 0.1; // Giảm còn 20% exp khi levelPercent >= 90%
+      } else if (member.levelPercent >= 70) {
+        expMultiplier = 0.4; // Giảm còn 40% exp khi levelPercent >= 70%
+      } else if (member.levelPercent >= 50) {
+        expMultiplier = 0.6; // Giảm còn 60% exp khi levelPercent >= 50%
+      } else if (member.levelPercent >= 30) {
+        expMultiplier = 0.8; // Giảm còn 80% exp khi levelPercent >= 30%
+      }
 
+      // Tính exp với hệ số giảm
+      const baseExp = Math.floor(totalMoney / 400);
+      const adjustedExp = Math.floor(baseExp * expMultiplier);
       member.exp += adjustedExp;
 
-      // Cập nhật levelPercent dựa trên exp
       member.levelPercent += Math.floor(adjustedExp / 10);
+
+      await bangCong.save();
       await member.save();
     }
-
-    await bangCong.save();
-  }
 
     await updateLevelPercent(userId);
     await updateMissionProgress(userId);
