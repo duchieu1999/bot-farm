@@ -1573,8 +1573,8 @@ async function processSubmission(msg, targetMsg) {
       const member = await Member.findOne({ userId });
       if (member) {
       // Tính exp giảm dần dựa trên levelPercent
-      const baseExp = Math.floor(totalMoney / 200); // Exp cơ bản
-      const reductionFactor = 1 - Math.log(1 + member.levelPercent) / Math.log(101); // Giảm dần chậm hơn
+      const baseExp = Math.floor(totalMoney / 300); // Exp cơ bản
+      const reductionFactor = Math.max(0.1, 1 - member.levelPercent / 100); // Giảm từ 1 (100%) xuống 0.1 (10%)
       const adjustedExp = Math.floor(baseExp * reductionFactor);
 
       member.exp += adjustedExp;
