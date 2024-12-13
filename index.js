@@ -979,12 +979,18 @@ bot.onText(/\/editacc/, async (msg) => {
     const keyboard = [];
     for (let i = 0; i < members.length; i += 2) {
       const row = [];
-      row.push({ text: members[i], callback_data: `select_member:${members[i]}` });
+      // Thêm ID ngắn gọn thay vì tên đầy đủ
+      row.push({ text: members[i], callback_data: `m:${i}` });
       if (members[i + 1]) {
-        row.push({ text: members[i + 1], callback_data: `select_member:${members[i + 1]}` });
+        row.push({ text: members[i + 1], callback_data: `m:${i+1}` });
       }
       keyboard.push(row);
     }
+
+    // Lưu danh sách thành viên vào session để tra cứu sau
+    sessions[chatId] = {
+      members: members
+    };
 
     await bot.sendMessage(chatId, 'Chọn thành viên cần chỉnh sửa ACC:', {
       reply_markup: {
@@ -1002,21 +1008,26 @@ bot.on('callback_query', async (query) => {
   const chatId = query.message.chat.id;
   const messageId = query.message.message_id;
 
-  if (data.startsWith('select_member:')) {
-    const member = data.split(':')[1];
+  if (data.startsWith('m:')) {
+    const memberIndex = parseInt(data.split(':')[1]);
+    const member = sessions[chatId].members[memberIndex];
+    sessions[chatId].selectedMember = member;
     
     // Lấy 7 ngày gần nhất
     const dates = [];
     for (let i = 0; i < 7; i++) {
       const date = new Date();
       date.setDate(date.getDate() - i);
-      dates.push(date.toLocaleDateString());
+      dates.push(date.toLocaleDateString('vi-VN'));
     }
 
-    // Tạo keyboard chọn ngày
-    const dateKeyboard = dates.map(date => [{
+    // Lưu dates vào session
+    sessions[chatId].dates = dates;
+
+    // Tạo keyboard chọn ngày với ID ngắn gọn
+    const dateKeyboard = dates.map((date, index) => [{
       text: date,
-      callback_data: `select_date:${member}:${date}`
+      callback_data: `d:${index}`
     }]);
 
     await bot.editMessageText('Chọn ngày cần chỉnh sửa:', {
@@ -1028,19 +1039,24 @@ bot.on('callback_query', async (query) => {
     });
   }
   
-  else if (data.startsWith('select_date:')) {
-    const [, member, date] = data.split(':');
+  else if (data.startsWith('d:')) {
+    const dateIndex = parseInt(data.split(':')[1]);
+    const member = sessions[chatId].selectedMember;
+    const date = sessions[chatId].dates[dateIndex];
+    
+    // Lưu date được chọn
+    sessions[chatId].selectedDate = date;
     
     // Tạo keyboard chọn ca
     const caKeyboard = [
       [
-        { text: 'Ca 1', callback_data: `select_ca:${member}:${date}:1` },
-        { text: 'Ca 2', callback_data: `select_ca:${member}:${date}:2` },
-        { text: 'Ca 3', callback_data: `select_ca:${member}:${date}:3` }
+        { text: 'Ca 1', callback_data: 'c:1' },
+        { text: 'Ca 2', callback_data: 'c:2' },
+        { text: 'Ca 3', callback_data: 'c:3' }
       ],
       [
-        { text: 'Ca 4', callback_data: `select_ca:${member}:${date}:4` },
-        { text: 'Ca 5', callback_data: `select_ca:${member}:${date}:5` }
+        { text: 'Ca 4', callback_data: 'c:4' },
+        { text: 'Ca 5', callback_data: 'c:5' }
       ]
     ];
 
@@ -1053,11 +1069,14 @@ bot.on('callback_query', async (query) => {
     });
   }
   
-  else if (data.startsWith('select_ca:')) {
-    const [, member, date, ca] = data.split(':');
+  else if (data.startsWith('c:')) {
+    const ca = data.split(':')[1];
+    const member = sessions[chatId].selectedMember;
+    const date = sessions[chatId].selectedDate;
     
-    // Lưu thông tin vào session để đợi người dùng nhập số ACC mới
-    sessions[chatId] = { member, date, ca };
+    // Lưu ca được chọn
+    sessions[chatId].selectedCa = ca;
+    sessions[chatId].waitingForAcc = true;
     
     await bot.editMessageText(
       `Chỉnh sửa ACC của ${member} ngày ${date} Ca ${ca}\n` +
@@ -1081,8 +1100,8 @@ bot.on('message', async (msg) => {
   const text = msg.text;
   
   // Kiểm tra xem có đang trong session chỉnh sửa ACC không
-  if (sessions[chatId]) {
-    const { member, date, ca } = sessions[chatId];
+  if (sessions[chatId] && sessions[chatId].waitingForAcc) {
+    const { selectedMember: member, selectedDate: date, selectedCa: ca } = sessions[chatId];
     
     // Kiểm tra input có phải là số không
     if (!/^\d+$/.test(text)) {
