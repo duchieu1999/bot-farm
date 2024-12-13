@@ -967,113 +967,82 @@ bot.onText(/\/444/, async (msg) => {
 
 
 
-const { InlineKeyboard } = require('node-telegram-keyboard-wrapper'); // Sử dụng thư viện để dễ tạo inline keyboard
-
-async function editBangCong(bot, chatId) {
-    // Lấy danh sách thành viên
-    const members = await getGroupMembers(-1002496228650); // Hàm này bạn cần định nghĩa để lấy danh sách thành viên
-    
-    // Bước 1: Chọn thành viên
-    const memberButtons = members.map(member => ({
-        text: member.name,
-        callback_data: `edit_member_${member.id}`
-    }));
-
-    const memberKeyboard = InlineKeyboard.create(memberButtons, 2); // Chia 2 cột
-
-    await bot.sendMessage(chatId, "Chọn thành viên để chỉnh sửa:", {
-        reply_markup: { inline_keyboard: memberKeyboard }
-    });
-
-    bot.on('callback_query', async (query) => {
-        const data = query.data;
-
-        if (data.startsWith('edit_member_')) {
-            const memberId = data.split('_')[2];
-            await askForDate(bot, query.message.chat.id, memberId);
-        }
-    });
-}
-
-async function askForDate(bot, chatId, memberId) {
-    const dates = Array.from({ length: 7 }, (_, i) => {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        return date.toLocaleDateString();
-    });
-
-    const dateButtons = dates.map(date => ({
-        text: date,
-        callback_data: `edit_date_${memberId}_${date}`
-    }));
-
-    const dateKeyboard = InlineKeyboard.create(dateButtons, 2); // Chia 2 cột
-
-    await bot.sendMessage(chatId, "Chọn ngày để chỉnh sửa:", {
-        reply_markup: { inline_keyboard: dateKeyboard }
-    });
-
-    bot.on('callback_query', async (query) => {
-        const data = query.data;
-
-        if (data.startsWith('edit_date_')) {
-            const [_, memberId, date] = data.split('_');
-            await askForCa(bot, query.message.chat.id, memberId, date);
-        }
-    });
-}
-
-async function askForCa(bot, chatId, memberId, date) {
-    const caButtons = Array.from({ length: 5 }, (_, i) => ({
-        text: `Ca ${i + 1}`,
-        callback_data: `edit_ca_${memberId}_${date}_Ca${i + 1}`
-    }));
-
-    const caKeyboard = InlineKeyboard.create(caButtons, 1); // Chia 1 cột
-
-    await bot.sendMessage(chatId, "Chọn ca để chỉnh sửa:", {
-        reply_markup: { inline_keyboard: caKeyboard }
-    });
-
-    bot.on('callback_query', async (query) => {
-        const data = query.data;
-
-        if (data.startsWith('edit_ca_')) {
-            const [_, memberId, date, ca] = data.split('_');
-            await askForAcc(bot, query.message.chat.id, memberId, date, ca);
-        }
-    });
-}
-
-async function askForAcc(bot, chatId, memberId, date, ca) {
-    await bot.sendMessage(chatId, `Nhập số ACC cho ${ca} ngày ${date} của thành viên ${memberId}:`);
-
-    bot.on('message', async (msg) => {
-        if (!isNaN(msg.text)) {
-            const acc = parseInt(msg.text, 10);
-            
-            // Lưu thông tin vào cơ sở dữ liệu
-            await saveEdit(memberId, date, ca, acc);
-
-            await bot.sendMessage(chatId, `Đã cập nhật ${acc} ACC cho ${ca} ngày ${date} của thành viên ${memberId}.`);
-        } else {
-            await bot.sendMessage(chatId, "Vui lòng nhập một số hợp lệ.");
-        }
-    });
-}
-
-async function saveEdit(memberId, date, ca, acc) {
-    // Hàm cập nhật thông tin vào cơ sở dữ liệu
-    await Trasua.updateOne(
-        { groupId: -1002496228650, date, 'caData.Ca': ca, memberId },
-        { $set: { 'caData.acc': acc } },
-        { upsert: true }
-    );
-}
-
+// Xử lý chức năng chỉnh sửa bảng công
 bot.onText(/\/editbangcong/, async (msg) => {
     const chatId = msg.chat.id;
-    await editBangCong(bot, chatId);
+
+    // Lấy danh sách thành viên từ cơ sở dữ liệu hoặc định nghĩa cứng
+    const members = await Trasua.distinct("ten", { groupId: -1002496228650 });
+
+    // Bước 1: Chọn thành viên
+    const memberButtons = members.map(member => [{ text: member, callback_data: `edit_member_${member}` }]);
+    await bot.sendMessage(chatId, "Chọn thành viên để chỉnh sửa:", {
+        reply_markup: {
+            inline_keyboard: memberButtons
+        }
+    });
+});
+
+// Xử lý lựa chọn thành viên
+bot.on("callback_query", async (callbackQuery) => {
+    const chatId = callbackQuery.message.chat.id;
+    const data = callbackQuery.data;
+
+    if (data.startsWith("edit_member_")) {
+        const selectedMember = data.replace("edit_member_", "");
+
+        // Bước 2: Chọn ngày
+        const days = 7; // Giới hạn số ngày gần đây
+        const dates = Array.from({ length: days }, (_, i) => {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            return date.toLocaleDateString();
+        });
+
+        const dateButtons = dates.map(date => [{ text: date, callback_data: `edit_date_${selectedMember}_${date}` }]);
+        await bot.sendMessage(chatId, `Chọn ngày để chỉnh sửa cho thành viên ${selectedMember}:`, {
+            reply_markup: {
+                inline_keyboard: dateButtons
+            }
+        });
+    } else if (data.startsWith("edit_date_")) {
+        const [_, selectedMember, selectedDate] = data.split("_");
+
+        // Bước 3: Chọn ca
+        const shifts = ["Ca 1", "Ca 2", "Ca 3", "Ca 4", "Ca 5"];
+        const shiftButtons = shifts.map(shift => [{ text: shift, callback_data: `edit_shift_${selectedMember}_${selectedDate}_${shift}` }]);
+        await bot.sendMessage(chatId, `Chọn ca để chỉnh sửa cho ${selectedMember} vào ngày ${selectedDate}:`, {
+            reply_markup: {
+                inline_keyboard: shiftButtons
+            }
+        });
+    } else if (data.startsWith("edit_shift_")) {
+        const [_, selectedMember, selectedDate, selectedShift] = data.split("_");
+
+        // Bước 4: Nhập số ACC
+        await bot.sendMessage(chatId, `Nhập số ACC cho ${selectedMember} vào ngày ${selectedDate}, ${selectedShift}:`, {
+            reply_markup: {
+                force_reply: true
+            }
+        });
+
+        // Chờ người dùng trả lời
+        bot.onReplyToMessage(chatId, callbackQuery.message.message_id, async (reply) => {
+            const acc = parseInt(reply.text);
+            if (isNaN(acc)) {
+                return bot.sendMessage(chatId, "Vui lòng nhập số ACC hợp lệ.");
+            }
+
+            // Lưu dữ liệu chỉnh sửa vào cơ sở dữ liệu
+            await Trasua.updateOne(
+                { groupId: -1002496228650, date: selectedDate, "caData.shift": selectedShift, ten: selectedMember },
+                { $set: { "caData.$.acc": acc } },
+                { upsert: true }
+            );
+
+            await bot.sendMessage(chatId, `Đã cập nhật số ACC (${acc}) cho ${selectedMember} vào ngày ${selectedDate}, ${selectedShift}.`);
+        });
+    }
 });
 
 
