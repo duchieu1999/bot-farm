@@ -967,6 +967,191 @@ bot.onText(/\/444/, async (msg) => {
 });
 
 
+// Tạo menu chọn thành viên và chỉnh sửa ACC
+bot.onText(/\/editacc/, async (msg) => {
+  const chatId = msg.chat.id;
+  
+  try {
+    // Lấy danh sách thành viên độc nhất từ database
+    const members = await Trasua.distinct('ten', { groupId: -1002496228650 });
+    
+    // Tạo keyboard với các nút chọn thành viên
+    const keyboard = [];
+    for (let i = 0; i < members.length; i += 2) {
+      const row = [];
+      row.push({ text: members[i], callback_data: `select_member:${members[i]}` });
+      if (members[i + 1]) {
+        row.push({ text: members[i + 1], callback_data: `select_member:${members[i + 1]}` });
+      }
+      keyboard.push(row);
+    }
+
+    await bot.sendMessage(chatId, 'Chọn thành viên cần chỉnh sửa ACC:', {
+      reply_markup: {
+        inline_keyboard: keyboard
+      }
+    });
+  } catch (error) {
+    bot.sendMessage(chatId, 'Có lỗi xảy ra: ' + error.message);
+  }
+});
+
+// Xử lý khi chọn thành viên
+bot.on('callback_query', async (query) => {
+  const data = query.data;
+  const chatId = query.message.chat.id;
+  const messageId = query.message.message_id;
+
+  if (data.startsWith('select_member:')) {
+    const member = data.split(':')[1];
+    
+    // Lấy 7 ngày gần nhất
+    const dates = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      dates.push(date.toLocaleDateString());
+    }
+
+    // Tạo keyboard chọn ngày
+    const dateKeyboard = dates.map(date => [{
+      text: date,
+      callback_data: `select_date:${member}:${date}`
+    }]);
+
+    await bot.editMessageText('Chọn ngày cần chỉnh sửa:', {
+      chat_id: chatId,
+      message_id: messageId,
+      reply_markup: {
+        inline_keyboard: dateKeyboard
+      }
+    });
+  }
+  
+  else if (data.startsWith('select_date:')) {
+    const [, member, date] = data.split(':');
+    
+    // Tạo keyboard chọn ca
+    const caKeyboard = [
+      [
+        { text: 'Ca 1', callback_data: `select_ca:${member}:${date}:1` },
+        { text: 'Ca 2', callback_data: `select_ca:${member}:${date}:2` },
+        { text: 'Ca 3', callback_data: `select_ca:${member}:${date}:3` }
+      ],
+      [
+        { text: 'Ca 4', callback_data: `select_ca:${member}:${date}:4` },
+        { text: 'Ca 5', callback_data: `select_ca:${member}:${date}:5` }
+      ]
+    ];
+
+    await bot.editMessageText(`Chỉnh sửa ACC của ${member} ngày ${date}\nChọn ca cần chỉnh sửa:`, {
+      chat_id: chatId,
+      message_id: messageId,
+      reply_markup: {
+        inline_keyboard: caKeyboard
+      }
+    });
+  }
+  
+  else if (data.startsWith('select_ca:')) {
+    const [, member, date, ca] = data.split(':');
+    
+    // Lưu thông tin vào session để đợi người dùng nhập số ACC mới
+    sessions[chatId] = { member, date, ca };
+    
+    await bot.editMessageText(
+      `Chỉnh sửa ACC của ${member} ngày ${date} Ca ${ca}\n` +
+      'Vui lòng nhập số ACC mới:',
+      {
+        chat_id: chatId,
+        message_id: messageId
+      }
+    );
+    
+    // Chuyển bot sang chế độ đợi nhập ACC
+    await bot.sendMessage(chatId, 'Nhập số ACC mới (chỉ nhập số):');
+  }
+});
+
+// Xử lý nhập số ACC mới
+const sessions = {};
+
+bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
+  const text = msg.text;
+  
+  // Kiểm tra xem có đang trong session chỉnh sửa ACC không
+  if (sessions[chatId]) {
+    const { member, date, ca } = sessions[chatId];
+    
+    // Kiểm tra input có phải là số không
+    if (!/^\d+$/.test(text)) {
+      return bot.sendMessage(chatId, 'Vui lòng chỉ nhập số!');
+    }
+    
+    const newAcc = parseInt(text);
+    
+    try {
+      // Tìm và cập nhật bảng công
+      const bangCong = await Trasua.findOne({
+        groupId: -1002496228650,
+        date: date,
+        ten: member
+      });
+
+      if (!bangCong) {
+        return bot.sendMessage(chatId, 'Không tìm thấy bảng công phù hợp');
+      }
+
+      // Lưu giá trị cũ
+      const oldAcc = bangCong.caData[`Ca${ca}`] || 0;
+
+      // Cập nhật giá trị mới
+      bangCong.caData[`Ca${ca}`] = newAcc;
+      
+      // Tính lại tổng ACC
+      bangCong.acc = Object.values(bangCong.caData).reduce((sum, val) => sum + (val || 0), 0);
+      
+      // Tính lại tiền công
+      bangCong.tinh_tien = bangCong.acc * 2000 + bangCong.post * 5000;
+
+      await bangCong.save();
+
+      // Lưu lịch sử chỉnh sửa
+      await new EditHistory({
+        bangCongId: bangCong._id,
+        editedBy: msg.from.username,
+        oldValue: oldAcc,
+        newValue: newAcc,
+        caNumber: parseInt(ca)
+      }).save();
+
+      // Xóa session
+      delete sessions[chatId];
+
+      // Hiển thị kết quả
+      await bot.sendMessage(
+        chatId,
+        `Đã cập nhật ACC của ${member} ngày ${date} Ca ${ca}\n` +
+        `ACC cũ: ${oldAcc} -> ACC mới: ${newAcc}\n` +
+        `Tổng ACC mới: ${bangCong.acc}\n` +
+        `Tiền công mới: ${bangCong.tinh_tien.toLocaleString()} VNĐ`
+      );
+
+      // Hiển thị lại bảng công
+      await generateReport(bot, chatId, 1);
+
+    } catch (error) {
+      bot.sendMessage(chatId, 'Có lỗi xảy ra: ' + error.message);
+    }
+  }
+});
+
+
+
+
+
+
 async function generateSchedule(bot, chatId) {
   const today = new Date();
   const yesterday = new Date();
