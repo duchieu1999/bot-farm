@@ -2256,7 +2256,7 @@ const normalizeName = (name) => {
 
 bot.onText(/Trừ/, async (msg) => {
   if (!msg.reply_to_message || !msg.reply_to_message.text) {
-    bot.sendMessage(msg.chat.id, 'Hãy trả lời vào đúng tin nhắn xác nhận của bot để cập nhật.');
+   
     return;
   }
 
@@ -2271,7 +2271,7 @@ bot.onText(/Trừ/, async (msg) => {
   const matched = replyText.match(/của (.+?) đã.*?(\d+) qu[aẩ]y.*?(\d+) c[ộô]ng.*?(\d+) bill.*?(\d+) [ảa]nh.*?vào (.*?) đ.*?([0-9,]+) VNĐ/is);
 
   if (!matched) {
-    bot.sendMessage(chatId, 'Tin nhắn trả lời không đúng định dạng xác nhận của bot.');
+    
     return;
   }
 
