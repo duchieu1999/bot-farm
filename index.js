@@ -973,24 +973,32 @@ const editStates = new Map();
 // Function tạo bàn phím inline cho việc chọn người
 async function createMemberKeyboard(chatId) {
     try {
-        const members = await bot.getChatMembers(-1002496228650);
+        // Lấy danh sách thành viên từ database
+        const members = await Trasua.distinct('ten', { groupId: -1002496228650 });
         const keyboard = [];
-        const row = [];
+        let row = [];
         
-        members.forEach(member => {
+        for (const memberName of members) {
             if (row.length === 2) {
                 keyboard.push([...row]);
-                row.length = 0;
+                row = [];
             }
+            // Sử dụng tên thành viên làm callback data
             row.push({
-                text: member.user.first_name,
-                callback_data: `edit_member:${member.user.id}`
+                text: memberName,
+                callback_data: `edit_member:${memberName}`
             });
-        });
+        }
         
         if (row.length > 0) {
-            keyboard.push([...row]);
+            keyboard.push(row);
         }
+
+        // Thêm nút Hủy
+        keyboard.push([{
+            text: '❌ Hủy',
+            callback_data: 'cancel_edit'
+        }]);
 
         return {
             inline_keyboard: keyboard
@@ -1025,6 +1033,12 @@ function createDateKeyboard() {
         keyboard.push([...row]);
     }
 
+    // Thêm nút Hủy
+    keyboard.push([{
+        text: '❌ Hủy',
+        callback_data: 'cancel_edit'
+    }]);
+
     return {
         inline_keyboard: keyboard
     };
@@ -1044,6 +1058,9 @@ function createShiftKeyboard() {
             ],
             [
                 { text: 'Ca 5', callback_data: 'edit_shift:5' }
+            ],
+            [
+                { text: '❌ Hủy', callback_data: 'cancel_edit' }
             ]
         ]
     };
@@ -1085,9 +1102,18 @@ bot.on('callback_query', async (callbackQuery) => {
     const state = editStates.get(chatId) || {};
 
     try {
+        if (data === 'cancel_edit') {
+            editStates.delete(chatId);
+            await bot.editMessageText('Đã hủy chỉnh sửa bảng công.', {
+                chat_id: chatId,
+                message_id: messageId
+            });
+            return;
+        }
+
         if (data.startsWith('edit_member:')) {
-            const userId = data.split(':')[1];
-            editStates.set(chatId, { ...state, memberId: userId, step: 'date' });
+            const memberName = data.split(':')[1];
+            editStates.set(chatId, { ...state, memberName, step: 'date' });
             
             await bot.editMessageText('Chọn ngày cần chỉnh sửa:', {
                 chat_id: chatId,
@@ -1109,11 +1135,14 @@ bot.on('callback_query', async (callbackQuery) => {
             const shift = data.split(':')[1];
             editStates.set(chatId, { ...state, shift, step: 'acc' });
             
-            await bot.editMessageText('Nhập số ACC cho ca này:', {
+            await bot.editMessageText(`Nhập số ACC cho ${state.memberName}, ngày ${state.date}, Ca ${shift}:`, {
                 chat_id: chatId,
                 message_id: messageId
             });
         }
+
+        // Xác nhận callback query để loại bỏ loading spinner
+        await bot.answerCallbackQuery(callbackQuery.id);
     } catch (error) {
         console.error('Error handling callback query:', error);
         bot.sendMessage(chatId, 'Có lỗi xảy ra trong quá trình xử lý.');
@@ -1133,19 +1162,26 @@ bot.on('message', async (msg) => {
 
         try {
             // Cập nhật số ACC vào database
-            await Trasua.findOneAndUpdate(
+            const result = await Trasua.findOneAndUpdate(
                 {
                     groupId: -1002496228650,
-                    userId: state.memberId,
+                    ten: state.memberName,
                     date: state.date
                 },
                 {
-                    [`caData.Ca${state.shift}`]: acc
+                    $set: {
+                        [`caData.Ca${state.shift}`]: acc
+                    }
                 },
-                { upsert: true }
+                { upsert: true, new: true }
             );
 
-            bot.sendMessage(chatId, 'Đã cập nhật bảng công thành công!');
+            const message = `Đã cập nhật bảng công:\n` +
+                          `- Tên: ${state.memberName}\n` +
+                          `- Ngày: ${state.date}\n` +
+                          `- Ca ${state.shift}: ${acc} ACC`;
+
+            bot.sendMessage(chatId, message);
             editStates.delete(chatId);
         } catch (error) {
             console.error('Error updating attendance:', error);
@@ -1153,7 +1189,6 @@ bot.on('message', async (msg) => {
         }
     }
 });
-
 
 
 
