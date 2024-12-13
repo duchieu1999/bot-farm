@@ -574,7 +574,7 @@ async function processAccMessage4(msg) {
 
 // Regex để tìm số acc và ca
 const accRegex = /(\d+)\s*[^a-zA-Z\d]*acc\b/gi;
-const caRegex = /ca\s*(10h|12h|15h|18h30|20h)/gi;
+const caRegex = /ca\s*(11h30|13h30|15h|18h30|20h)/gi;
 
 // Regex để tìm bài đăng (chỉ số và chữ "b" hợp lệ)
 const postRegex = /^\s*(\d+)\s*[bB]\s*$/gi;
@@ -742,9 +742,9 @@ async function processPostSubmission(msg, postMatches) {
 // Hàm ánh xạ giờ thành khóa ca
 function mapCaHourToKey(hour) {
   switch (hour) {
-    case '10h':
+    case '11h30':
       return 'Ca1';
-    case '12h':
+    case '13h30':
       return 'Ca2';
     case '15h':
       return 'Ca3';
@@ -982,8 +982,8 @@ async function generateSchedule(bot, chatId) {
 
   // Định nghĩa các khung giờ đăng bài theo các ca
 const timeRanges = [
-{ start: '10:30', end: '11:30' }, //tương ứng ca 1
-{ start: '12:30', end: '14:30' }, //tương ứng ca 2
+{ start: '11:30', end: '11:30' }, //tương ứng ca 1
+{ start: '13:30', end: '14:30' }, //tương ứng ca 2
 { start: '15:30', end: '18:00' }, //tương ứng ca 3
 { start: '18:50', end: '19:30' }, //tương ứng ca 4
 ];
@@ -2371,8 +2371,8 @@ const billHistorySchema = new mongoose.Schema({
 const BillHistory = mongoose.model('BillHistory', billHistorySchema);
 
 const timeSlots = [
-  { time: '9:30', label: 'ca 10h00' },
-  { time: '11:30', label: 'ca 12h00' },
+  { time: '11:00', label: 'ca 11h30' },
+  { time: '13:00', label: 'ca 13h30' },
   { time: '14:30', label: 'ca 15h00' }, 
   { time: '18:00', label: 'ca 18h30' },
   { time: '19:30', label: 'ca 20h00' }
@@ -2388,7 +2388,7 @@ let upBillMembers = [];
 let isWaitingForBills = false;
 let currentCa = '';
 
-schedule.scheduleJob('15 0 * * *', async () => {
+cron.schedule('15 0 * * *', async () => {
   try {
     await Attendance.deleteMany({});
     await BillHistory.deleteMany({ date: { $lt: new Date() } });
