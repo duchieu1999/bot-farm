@@ -978,26 +978,27 @@ async function createMemberKeyboard(chatId) {
         const keyboard = [];
         let row = [];
         
-        for (const memberName of members) {
+        for (let i = 0; i < members.length; i++) {
             if (row.length === 2) {
                 keyboard.push([...row]);
                 row = [];
             }
-            // Sử dụng tên thành viên làm callback data
+            // Sử dụng index làm callback data để rút gọn
             row.push({
-                text: memberName,
-                callback_data: `edit_member:${memberName}`
+                text: members[i],
+                callback_data: `e_m:${i}` // Rút gọn edit_member thành e_m
             });
+            // Lưu mapping giữa index và tên thành viên
+            editStates.set(`member_${i}`, members[i]);
         }
         
         if (row.length > 0) {
             keyboard.push(row);
         }
 
-        // Thêm nút Hủy
         keyboard.push([{
             text: '❌ Hủy',
-            callback_data: 'cancel_edit'
+            callback_data: 'cancel'
         }]);
 
         return {
@@ -1025,7 +1026,7 @@ function createDateKeyboard() {
         }
         row.push({
             text: dateStr,
-            callback_data: `edit_date:${dateStr}`
+            callback_data: `e_d:${i}` // Rút gọn edit_date thành e_d
         });
     }
     
@@ -1033,10 +1034,9 @@ function createDateKeyboard() {
         keyboard.push([...row]);
     }
 
-    // Thêm nút Hủy
     keyboard.push([{
         text: '❌ Hủy',
-        callback_data: 'cancel_edit'
+        callback_data: 'cancel'
     }]);
 
     return {
@@ -1049,28 +1049,27 @@ function createShiftKeyboard() {
     return {
         inline_keyboard: [
             [
-                { text: 'Ca 1', callback_data: 'edit_shift:1' },
-                { text: 'Ca 2', callback_data: 'edit_shift:2' }
+                { text: 'Ca 1', callback_data: 'e_s:1' },
+                { text: 'Ca 2', callback_data: 'e_s:2' }
             ],
             [
-                { text: 'Ca 3', callback_data: 'edit_shift:3' },
-                { text: 'Ca 4', callback_data: 'edit_shift:4' }
+                { text: 'Ca 3', callback_data: 'e_s:3' },
+                { text: 'Ca 4', callback_data: 'e_s:4' }
             ],
             [
-                { text: 'Ca 5', callback_data: 'edit_shift:5' }
+                { text: 'Ca 5', callback_data: 'e_s:5' }
             ],
             [
-                { text: '❌ Hủy', callback_data: 'cancel_edit' }
+                { text: '❌ Hủy', callback_data: 'cancel' }
             ]
         ]
     };
 }
 
 // Xử lý lệnh /edit để bắt đầu quá trình chỉnh sửa
-bot.onText(/\/editbc/, async (msg) => {
+bot.onText(/\/edit/, async (msg) => {
     const chatId = msg.chat.id;
     
-    // Kiểm tra quyền admin
     try {
         const member = await bot.getChatMember(chatId, msg.from.id);
         if (!['creator', 'administrator'].includes(member.status)) {
@@ -1081,7 +1080,6 @@ bot.onText(/\/editbc/, async (msg) => {
         return bot.sendMessage(chatId, 'Có lỗi xảy ra khi kiểm tra quyền hạn.');
     }
 
-    // Bắt đầu quá trình chỉnh sửa
     const keyboard = await createMemberKeyboard(chatId);
     if (!keyboard) {
         return bot.sendMessage(chatId, 'Có lỗi xảy ra khi tạo danh sách thành viên.');
@@ -1102,7 +1100,7 @@ bot.on('callback_query', async (callbackQuery) => {
     const state = editStates.get(chatId) || {};
 
     try {
-        if (data === 'cancel_edit') {
+        if (data === 'cancel') {
             editStates.delete(chatId);
             await bot.editMessageText('Đã hủy chỉnh sửa bảng công.', {
                 chat_id: chatId,
@@ -1111,8 +1109,9 @@ bot.on('callback_query', async (callbackQuery) => {
             return;
         }
 
-        if (data.startsWith('edit_member:')) {
-            const memberName = data.split(':')[1];
+        if (data.startsWith('e_m:')) {
+            const memberIndex = data.split(':')[1];
+            const memberName = editStates.get(`member_${memberIndex}`);
             editStates.set(chatId, { ...state, memberName, step: 'date' });
             
             await bot.editMessageText('Chọn ngày cần chỉnh sửa:', {
@@ -1121,9 +1120,13 @@ bot.on('callback_query', async (callbackQuery) => {
                 reply_markup: createDateKeyboard()
             });
         }
-        else if (data.startsWith('edit_date:')) {
-            const date = data.split(':')[1];
-            editStates.set(chatId, { ...state, date, step: 'shift' });
+        else if (data.startsWith('e_d:')) {
+            const dayIndex = parseInt(data.split(':')[1]);
+            const date = new Date();
+            date.setDate(date.getDate() - dayIndex);
+            const dateStr = date.toLocaleDateString('vi-VN');
+            
+            editStates.set(chatId, { ...state, date: dateStr, step: 'shift' });
             
             await bot.editMessageText('Chọn ca cần chỉnh sửa:', {
                 chat_id: chatId,
@@ -1131,7 +1134,7 @@ bot.on('callback_query', async (callbackQuery) => {
                 reply_markup: createShiftKeyboard()
             });
         }
-        else if (data.startsWith('edit_shift:')) {
+        else if (data.startsWith('e_s:')) {
             const shift = data.split(':')[1];
             editStates.set(chatId, { ...state, shift, step: 'acc' });
             
@@ -1141,7 +1144,6 @@ bot.on('callback_query', async (callbackQuery) => {
             });
         }
 
-        // Xác nhận callback query để loại bỏ loading spinner
         await bot.answerCallbackQuery(callbackQuery.id);
     } catch (error) {
         console.error('Error handling callback query:', error);
@@ -1161,7 +1163,6 @@ bot.on('message', async (msg) => {
         }
 
         try {
-            // Cập nhật số ACC vào database
             const result = await Trasua.findOneAndUpdate(
                 {
                     groupId: -1002496228650,
