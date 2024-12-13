@@ -1067,7 +1067,7 @@ function createShiftKeyboard() {
 }
 
 // Xử lý lệnh /edit để bắt đầu quá trình chỉnh sửa
-bot.onText(/\/edit/, async (msg) => {
+bot.onText(/\/editbangcong/, async (msg) => {
     const chatId = msg.chat.id;
     
     try {
