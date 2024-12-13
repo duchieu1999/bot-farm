@@ -973,7 +973,7 @@ async function editBangCong(bot, chatId) {
     // Bước 1: Chọn người
     const memberKeyboard = members.map((member) => [{
         text: member,
-        callback_data: `edit_member_${member}`
+        callback_data: `m_${Buffer.from(member).toString('base64')}` // Mã hóa tên
     }]);
 
     bot.sendMessage(chatId, "Chọn thành viên cần chỉnh sửa:", {
@@ -983,12 +983,10 @@ async function editBangCong(bot, chatId) {
     });
 
     bot.on('callback_query', async (query) => {
-        const [action, step, data] = query.data.split('_');
+        const data = query.data;
 
-        if (action === 'edit' && step === 'member') {
-            const selectedMember = data;
-
-            // Bước 2: Chọn ngày
+        if (data.startsWith('m_')) {
+            const selectedMember = Buffer.from(data.slice(2), 'base64').toString(); // Giải mã tên
             const dates = [...Array(7)].map((_, i) => {
                 const date = new Date();
                 date.setDate(date.getDate() - i);
@@ -997,7 +995,7 @@ async function editBangCong(bot, chatId) {
 
             const dateKeyboard = dates.map((date) => [{
                 text: date,
-                callback_data: `edit_date_${selectedMember}_${date}`
+                callback_data: `d_${Buffer.from(`${selectedMember}_${date}`).toString('base64')}`
             }]);
 
             bot.sendMessage(chatId, `Chọn ngày cần chỉnh sửa cho ${selectedMember}:`, {
@@ -1005,13 +1003,11 @@ async function editBangCong(bot, chatId) {
                     inline_keyboard: dateKeyboard
                 }
             });
-        } else if (action === 'edit' && step === 'date') {
-            const [selectedMember, selectedDate] = data.split('_');
-
-            // Bước 3: Chọn ca
+        } else if (data.startsWith('d_')) {
+            const [selectedMember, selectedDate] = Buffer.from(data.slice(2), 'base64').toString().split('_');
             const caKeyboard = Array.from({ length: 5 }, (_, i) => [{
                 text: `Ca ${i + 1}`,
-                callback_data: `edit_ca_${selectedMember}_${selectedDate}_${i + 1}`
+                callback_data: `c_${Buffer.from(`${selectedMember}_${selectedDate}_${i + 1}`).toString('base64')}`
             }]);
 
             bot.sendMessage(chatId, `Chọn ca cần chỉnh sửa cho ${selectedMember} ngày ${selectedDate}:`, {
@@ -1019,10 +1015,8 @@ async function editBangCong(bot, chatId) {
                     inline_keyboard: caKeyboard
                 }
             });
-        } else if (action === 'edit' && step === 'ca') {
-            const [selectedMember, selectedDate, selectedCa] = data.split('_');
-
-            // Bước 4: Nhập số ACC
+        } else if (data.startsWith('c_')) {
+            const [selectedMember, selectedDate, selectedCa] = Buffer.from(data.slice(2), 'base64').toString().split('_');
             bot.sendMessage(chatId, `Nhập số ACC cho ${selectedMember} ngày ${selectedDate}, ca ${selectedCa}:`);
 
             bot.once('message', async (msg) => {
@@ -1033,7 +1027,6 @@ async function editBangCong(bot, chatId) {
                     return;
                 }
 
-                // Lưu dữ liệu vào cơ sở dữ liệu
                 const updateResult = await Trasua.updateOne(
                     { groupId: -1002496228650, date: selectedDate, "caData.Ca": selectedCa, ten: selectedMember },
                     { $set: { acc: acc } }
@@ -1042,7 +1035,6 @@ async function editBangCong(bot, chatId) {
                 if (updateResult.matchedCount > 0) {
                     bot.sendMessage(chatId, `Đã cập nhật ACC thành công cho ${selectedMember} ngày ${selectedDate}, ca ${selectedCa}: ${acc} ACC.`);
 
-                    // Hiển thị kết quả sau chỉnh sửa
                     const updatedEntry = await Trasua.findOne({ groupId: -1002496228650, date: selectedDate, ten: selectedMember });
 
                     const details = `Tên: ${updatedEntry.ten}\nNgày: ${selectedDate}\nCa: ${selectedCa}\nACC: ${updatedEntry.acc}\nBài Đăng: ${updatedEntry.post}\nTiền Công: ${updatedEntry.tinh_tien.toLocaleString()} vnđ`;
@@ -1061,6 +1053,7 @@ bot.onText(/\/editBangCong/, (msg) => {
     const chatId = msg.chat.id;
     editBangCong(bot, chatId);
 });
+
 
 
 
