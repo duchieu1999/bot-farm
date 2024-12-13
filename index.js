@@ -979,7 +979,6 @@ bot.onText(/\/editacc/, async (msg) => {
     const keyboard = [];
     for (let i = 0; i < members.length; i += 2) {
       const row = [];
-      // Thêm ID ngắn gọn thay vì tên đầy đủ
       row.push({ text: members[i], callback_data: `m:${i}` });
       if (members[i + 1]) {
         row.push({ text: members[i + 1], callback_data: `m:${i+1}` });
@@ -987,7 +986,6 @@ bot.onText(/\/editacc/, async (msg) => {
       keyboard.push(row);
     }
 
-    // Lưu danh sách thành viên vào session để tra cứu sau
     sessions[chatId] = {
       members: members
     };
@@ -1013,20 +1011,28 @@ bot.on('callback_query', async (query) => {
     const member = sessions[chatId].members[memberIndex];
     sessions[chatId].selectedMember = member;
     
-    // Lấy 7 ngày gần nhất
+    // Lấy 7 ngày gần nhất với format đúng cho database
     const dates = [];
+    const displayDates = [];
     for (let i = 0; i < 7; i++) {
       const date = new Date();
       date.setDate(date.getDate() - i);
-      dates.push(date.toLocaleDateString('vi-VN'));
+      
+      // Format cho database (DD/MM/YYYY)
+      const dbDate = `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+      dates.push(dbDate);
+      
+      // Format hiển thị
+      const displayDate = date.toLocaleDateString('vi-VN');
+      displayDates.push(displayDate);
     }
 
-    // Lưu dates vào session
     sessions[chatId].dates = dates;
+    sessions[chatId].displayDates = displayDates;
 
-    // Tạo keyboard chọn ngày với ID ngắn gọn
+    // Tạo keyboard chọn ngày
     const dateKeyboard = dates.map((date, index) => [{
-      text: date,
+      text: displayDates[index],
       callback_data: `d:${index}`
     }]);
 
@@ -1043,9 +1049,10 @@ bot.on('callback_query', async (query) => {
     const dateIndex = parseInt(data.split(':')[1]);
     const member = sessions[chatId].selectedMember;
     const date = sessions[chatId].dates[dateIndex];
+    const displayDate = sessions[chatId].displayDates[dateIndex];
     
-    // Lưu date được chọn
     sessions[chatId].selectedDate = date;
+    sessions[chatId].selectedDisplayDate = displayDate;
     
     // Tạo keyboard chọn ca
     const caKeyboard = [
@@ -1060,7 +1067,7 @@ bot.on('callback_query', async (query) => {
       ]
     ];
 
-    await bot.editMessageText(`Chỉnh sửa ACC của ${member} ngày ${date}\nChọn ca cần chỉnh sửa:`, {
+    await bot.editMessageText(`Chỉnh sửa ACC của ${member} ngày ${displayDate}\nChọn ca cần chỉnh sửa:`, {
       chat_id: chatId,
       message_id: messageId,
       reply_markup: {
@@ -1072,14 +1079,13 @@ bot.on('callback_query', async (query) => {
   else if (data.startsWith('c:')) {
     const ca = data.split(':')[1];
     const member = sessions[chatId].selectedMember;
-    const date = sessions[chatId].selectedDate;
+    const displayDate = sessions[chatId].selectedDisplayDate;
     
-    // Lưu ca được chọn
     sessions[chatId].selectedCa = ca;
     sessions[chatId].waitingForAcc = true;
     
     await bot.editMessageText(
-      `Chỉnh sửa ACC của ${member} ngày ${date} Ca ${ca}\n` +
+      `Chỉnh sửa ACC của ${member} ngày ${displayDate} Ca ${ca}\n` +
       'Vui lòng nhập số ACC mới:',
       {
         chat_id: chatId,
@@ -1087,7 +1093,6 @@ bot.on('callback_query', async (query) => {
       }
     );
     
-    // Chuyển bot sang chế độ đợi nhập ACC
     await bot.sendMessage(chatId, 'Nhập số ACC mới (chỉ nhập số):');
   }
 });
@@ -1099,11 +1104,14 @@ bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
   
-  // Kiểm tra xem có đang trong session chỉnh sửa ACC không
   if (sessions[chatId] && sessions[chatId].waitingForAcc) {
-    const { selectedMember: member, selectedDate: date, selectedCa: ca } = sessions[chatId];
+    const { 
+      selectedMember: member, 
+      selectedDate: date,
+      selectedDisplayDate: displayDate, 
+      selectedCa: ca 
+    } = sessions[chatId];
     
-    // Kiểm tra input có phải là số không
     if (!/^\d+$/.test(text)) {
       return bot.sendMessage(chatId, 'Vui lòng chỉ nhập số!');
     }
@@ -1111,7 +1119,13 @@ bot.on('message', async (msg) => {
     const newAcc = parseInt(text);
     
     try {
-      // Tìm và cập nhật bảng công
+      // Log để debug
+      console.log('Searching for:', {
+        groupId: -1002496228650,
+        date: date,
+        ten: member
+      });
+
       const bangCong = await Trasua.findOne({
         groupId: -1002496228650,
         date: date,
@@ -1119,24 +1133,16 @@ bot.on('message', async (msg) => {
       });
 
       if (!bangCong) {
-        return bot.sendMessage(chatId, 'Không tìm thấy bảng công phù hợp');
+        return bot.sendMessage(chatId, `Không tìm thấy bảng công cho ${member} ngày ${date}`);
       }
 
-      // Lưu giá trị cũ
       const oldAcc = bangCong.caData[`Ca${ca}`] || 0;
-
-      // Cập nhật giá trị mới
       bangCong.caData[`Ca${ca}`] = newAcc;
-      
-      // Tính lại tổng ACC
       bangCong.acc = Object.values(bangCong.caData).reduce((sum, val) => sum + (val || 0), 0);
-      
-      // Tính lại tiền công
       bangCong.tinh_tien = bangCong.acc * 2000 + bangCong.post * 5000;
 
       await bangCong.save();
 
-      // Lưu lịch sử chỉnh sửa
       await new EditHistory({
         bangCongId: bangCong._id,
         editedBy: msg.from.username,
@@ -1145,22 +1151,20 @@ bot.on('message', async (msg) => {
         caNumber: parseInt(ca)
       }).save();
 
-      // Xóa session
       delete sessions[chatId];
 
-      // Hiển thị kết quả
       await bot.sendMessage(
         chatId,
-        `Đã cập nhật ACC của ${member} ngày ${date} Ca ${ca}\n` +
+        `Đã cập nhật ACC của ${member} ngày ${displayDate} Ca ${ca}\n` +
         `ACC cũ: ${oldAcc} -> ACC mới: ${newAcc}\n` +
         `Tổng ACC mới: ${bangCong.acc}\n` +
         `Tiền công mới: ${bangCong.tinh_tien.toLocaleString()} VNĐ`
       );
 
-      // Hiển thị lại bảng công
       await generateReport(bot, chatId, 1);
 
     } catch (error) {
+      console.error('Error:', error);
       bot.sendMessage(chatId, 'Có lỗi xảy ra: ' + error.message);
     }
   }
