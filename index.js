@@ -1010,6 +1010,13 @@ async function createMemberKeyboard(chatId) {
     }
 }
 
+// Hàm chuyển đổi định dạng ngày từ vi-VN sang ISO format
+function convertDateFormat(dateStr) {
+    const parts = dateStr.split('/');
+    // Chuyển từ DD/MM/YYYY sang YYYY-MM-DD
+    return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+}
+
 // Function tạo bàn phím cho việc chọn ngày
 function createDateKeyboard() {
     const keyboard = [];
@@ -1018,6 +1025,7 @@ function createDateKeyboard() {
     for (let i = 0; i < 7; i++) {
         const date = new Date();
         date.setDate(date.getDate() - i);
+        // Lưu ngày dưới dạng dd/mm/yyyy để hiển thị
         const dateStr = date.toLocaleDateString('vi-VN');
         
         if (row.length === 2) {
@@ -1026,7 +1034,7 @@ function createDateKeyboard() {
         }
         row.push({
             text: dateStr,
-            callback_data: `e_d:${i}` // Rút gọn edit_date thành e_d
+            callback_data: `e_d:${i}`
         });
     }
     
@@ -1163,30 +1171,55 @@ bot.on('message', async (msg) => {
         }
 
         try {
+            // Chuyển đổi định dạng ngày trước khi cập nhật
+            const formattedDate = convertDateFormat(state.date);
+            
+            console.log('Updating database with:', {
+                groupId: -1002496228650,
+                ten: state.memberName,
+                date: formattedDate,
+                shift: state.shift,
+                acc: acc
+            });
+
             const result = await Trasua.findOneAndUpdate(
                 {
                     groupId: -1002496228650,
                     ten: state.memberName,
-                    date: state.date
+                    date: formattedDate
                 },
                 {
                     $set: {
-                        [`caData.Ca${state.shift}`]: acc
+                        [`caData.Ca${state.shift}`]: acc,
+                        groupId: -1002496228650, // Đảm bảo groupId được set
+                        ten: state.memberName,    // Đảm bảo tên được set
+                        date: formattedDate       // Đảm bảo ngày được set
                     }
                 },
-                { upsert: true, new: true }
+                { 
+                    upsert: true, 
+                    new: true,
+                    setDefaultsOnInsert: true
+                }
             );
 
-            const message = `Đã cập nhật bảng công:\n` +
-                          `- Tên: ${state.memberName}\n` +
-                          `- Ngày: ${state.date}\n` +
-                          `- Ca ${state.shift}: ${acc} ACC`;
+            console.log('Database update result:', result);
 
-            bot.sendMessage(chatId, message);
+            if (result) {
+                const message = `Đã cập nhật bảng công:\n` +
+                              `- Tên: ${state.memberName}\n` +
+                              `- Ngày: ${state.date}\n` +
+                              `- Ca ${state.shift}: ${acc} ACC`;
+
+                bot.sendMessage(chatId, message);
+            } else {
+                throw new Error('Không thể cập nhật dữ liệu');
+            }
+
             editStates.delete(chatId);
         } catch (error) {
             console.error('Error updating attendance:', error);
-            bot.sendMessage(chatId, 'Có lỗi xảy ra khi cập nhật bảng công.');
+            bot.sendMessage(chatId, 'Có lỗi xảy ra khi cập nhật bảng công. Chi tiết lỗi: ' + error.message);
         }
     }
 });
