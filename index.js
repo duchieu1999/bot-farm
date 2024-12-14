@@ -3225,54 +3225,7 @@ async function generateAndSendImages(chatId) {
   }
 }
 
-async function createImage(content, groupName, totalAmount, dateStr) {
-  const url = 'https://quickchart.io/graphviz?format=png&layout=dot&graph=';
-  const graph = `
-    digraph G {
-      node [shape=plaintext];
-      a [label=<
-        <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" STYLE="font-family: 'Arial', sans-serif; border: 1px solid black;">
-          <TR><TD COLSPAN="4" ALIGN="CENTER" BGCOLOR="#FFCC00" STYLE="font-size: 16px; font-weight: bold;">${groupName} - ${dateStr}</TD></TR>
-          <TR STYLE="font-weight: bold; background-color: #FFCC00;">
-            <TD ALIGN="CENTER">Tên</TD>
-            <TD ALIGN="CENTER">Quẩy</TD>
-            <TD ALIGN="CENTER">Cộng</TD>
-            <TD ALIGN="CENTER">Tiền công</TD>
-          </TR>
-                    ${content.split('\n').map(line => `<TR><TD ALIGN="LEFT" STYLE="font-weight: bold;">${line.split('\t').join('</TD><TD ALIGN="CENTER">')}</TD></TR>`).join('')}
-          <TR STYLE="font-weight: bold;">
-            <TD COLSPAN="3" ALIGN="LEFT">Tổng số tiền</TD>
-            <TD ALIGN="CENTER">${totalAmount}vnđ</TD>
-          </TR>
-        </TABLE>
-      >];
-    }
-  `;
-  const imageUrl = `${url}${encodeURIComponent(graph)}`;
-  return imageUrl;
-}
 
-async function createTotalAmountImage(content, dateStr) {
-  const url = 'https://quickchart.io/graphviz?format=png&layout=dot&graph=';
-  const graph = `
-    digraph G {
-      node [shape=plaintext];
-      a [label=<
-        <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" STYLE="font-family: 'Arial', sans-serif; border: 1px solid black;">
-          <TR><TD COLSPAN="2" ALIGN="CENTER" BGCOLOR="#FFCC00" STYLE="font-size: 16px; font-weight: bold;">Tổng số tiền của từng thành viên từ tất cả các nhóm ${dateStr}</TD></TR>
-          ${content}
-        </TABLE>
-      >];
-    }
-  `;
-  const imageUrl = `${url}${encodeURIComponent(graph)}`;
-  return imageUrl;
-}
-
-bot.onText(/\/anhbangcong/, async (msg) => {
-  const chatId = msg.chat.id;
-  await generateAndSendImages(chatId);
-});
 
 
 // Thay thế YOUR_API_KEY bằng API key OpenWeatherMap của bạn
