@@ -981,7 +981,7 @@ function initSession(userId) {
 }
 
 // Khởi tạo command /edit
-bot.onText(/\/edit/, async (msg) => {
+bot.onText(/\/editbc/, async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
   
