@@ -967,263 +967,178 @@ bot.onText(/\/444/, async (msg) => {
 
 
 
-// Lưu trữ trạng thái chỉnh sửa tạm thời
-const editStates = new Map();
-
-// Function tạo bàn phím inline cho việc chọn người
-async function createMemberKeyboard(chatId) {
-    try {
-        // Lấy danh sách thành viên từ database
-        const members = await Trasua.distinct('ten', { groupId: -1002496228650 });
-        const keyboard = [];
-        let row = [];
-        
-        for (let i = 0; i < members.length; i++) {
-            if (row.length === 2) {
-                keyboard.push([...row]);
-                row = [];
-            }
-            // Sử dụng index làm callback data để rút gọn
-            row.push({
-                text: members[i],
-                callback_data: `e_m:${i}` // Rút gọn edit_member thành e_m
-            });
-            // Lưu mapping giữa index và tên thành viên
-            editStates.set(`member_${i}`, members[i]);
-        }
-        
-        if (row.length > 0) {
-            keyboard.push(row);
-        }
-
-        keyboard.push([{
-            text: '❌ Hủy',
-            callback_data: 'cancel'
-        }]);
-
-        return {
-            inline_keyboard: keyboard
-        };
-    } catch (error) {
-        console.error('Error creating member keyboard:', error);
-        return null;
+// Utility function to chunk array into smaller arrays
+function chunkArray(array, size) {
+    const chunks = [];
+    for (let i = 0; i < array.length; i += size) {
+        chunks.push(array.slice(i, i + size));
     }
+    return chunks;
 }
 
-// Hàm chuyển đổi định dạng ngày từ vi-VN sang ISO format
-function convertDateFormat(dateStr) {
-    const parts = dateStr.split('/');
-    // Chuyển từ DD/MM/YYYY sang YYYY-MM-DD
-    return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-}
+// State management for edit sessions
+const editSessions = new Map();
 
-// Function tạo bàn phím cho việc chọn ngày
-function createDateKeyboard() {
-    const keyboard = [];
-    const row = [];
-    
-    for (let i = 0; i < 7; i++) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        // Lưu ngày dưới dạng dd/mm/yyyy để hiển thị
-        const dateStr = date.toLocaleDateString('vi-VN');
-        
-        if (row.length === 2) {
-            keyboard.push([...row]);
-            row.length = 0;
-        }
-        row.push({
-            text: dateStr,
-            callback_data: `e_d:${i}`
-        });
-    }
-    
-    if (row.length > 0) {
-        keyboard.push([...row]);
-    }
-
-    keyboard.push([{
-        text: '❌ Hủy',
-        callback_data: 'cancel'
-    }]);
-
-    return {
-        inline_keyboard: keyboard
-    };
-}
-
-// Function tạo bàn phím cho việc chọn ca
-function createShiftKeyboard() {
-    return {
-        inline_keyboard: [
-            [
-                { text: 'Ca 1', callback_data: 'e_s:1' },
-                { text: 'Ca 2', callback_data: 'e_s:2' }
-            ],
-            [
-                { text: 'Ca 3', callback_data: 'e_s:3' },
-                { text: 'Ca 4', callback_data: 'e_s:4' }
-            ],
-            [
-                { text: 'Ca 5', callback_data: 'e_s:5' }
-            ],
-            [
-                { text: '❌ Hủy', callback_data: 'cancel' }
-            ]
-        ]
-    };
-}
-
-// Xử lý lệnh /edit để bắt đầu quá trình chỉnh sửa
-bot.onText(/\/editbangcong/, async (msg) => {
+// Step 1: Initialize edit command
+bot.onText(/\/editbc/, async (msg) => {
     const chatId = msg.chat.id;
-    
-    try {
-        const member = await bot.getChatMember(chatId, msg.from.id);
-        if (!['creator', 'administrator'].includes(member.status)) {
-            return bot.sendMessage(chatId, 'Bạn không có quyền chỉnh sửa bảng công.');
-        }
-    } catch (error) {
-        console.error('Error checking admin rights:', error);
-        return bot.sendMessage(chatId, 'Có lỗi xảy ra khi kiểm tra quyền hạn.');
-    }
-
-    const keyboard = await createMemberKeyboard(chatId);
-    if (!keyboard) {
-        return bot.sendMessage(chatId, 'Có lỗi xảy ra khi tạo danh sách thành viên.');
-    }
-
-    editStates.set(chatId, { step: 'member' });
-    
-    bot.sendMessage(chatId, 'Chọn thành viên cần chỉnh sửa bảng công:', {
-        reply_markup: keyboard
-    });
+    await startEditProcess(chatId);
 });
 
-// Xử lý các callback từ inline keyboard
-bot.on('callback_query', async (callbackQuery) => {
-    const chatId = callbackQuery.message.chat.id;
-    const data = callbackQuery.data;
-    const messageId = callbackQuery.message.message_id;
-    const state = editStates.get(chatId) || {};
+async function startEditProcess(chatId) {
+    // Clear any existing session
+    editSessions.delete(chatId);
+    
+    // Get unique members from database
+    const members = await Trasua.distinct('ten', { groupId: -1002496228650 });
+    
+    // Create keyboard with 2 members per row
+    const memberChunks = chunkArray(members, 2);
+    const keyboard = memberChunks.map(chunk => 
+        chunk.map(member => ({
+            text: member,
+            callback_data: `edit_member:${Buffer.from(member).toString('base64')}`
+        }))
+    );
 
-    try {
-        if (data === 'cancel') {
-            editStates.delete(chatId);
-            await bot.editMessageText('Đã hủy chỉnh sửa bảng công.', {
+    await bot.sendMessage(chatId, 'Chọn thành viên cần chỉnh sửa:', {
+        reply_markup: {
+            inline_keyboard: keyboard
+        }
+    });
+}
+
+// Step 2: Handle member selection and show date selection
+bot.on('callback_query', async (query) => {
+    const chatId = query.message.chat.id;
+    const data = query.data;
+
+    if (data.startsWith('edit_member:')) {
+        const memberBase64 = data.split(':')[1];
+        const member = Buffer.from(memberBase64, 'base64').toString();
+        
+        // Store member in session
+        editSessions.set(chatId, { member });
+
+        // Show date selection (last 7 days)
+        const dates = [];
+        for (let i = 0; i < 7; i++) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            dates.push(date.toLocaleDateString());
+        }
+
+        const dateKeyboard = chunkArray(dates, 2).map(chunk =>
+            chunk.map(date => ({
+                text: date,
+                callback_data: `edit_date:${date}`
+            }))
+        );
+
+        await bot.editMessageText('Chọn ngày cần chỉnh sửa:', {
+            chat_id: chatId,
+            message_id: query.message.message_id,
+            reply_markup: {
+                inline_keyboard: dateKeyboard
+            }
+        });
+    }
+    else if (data.startsWith('edit_date:')) {
+        const date = data.split(':')[1];
+        const session = editSessions.get(chatId);
+        session.date = date;
+        
+        // Show shift selection
+        const shiftKeyboard = [
+            [
+                { text: 'Ca 1', callback_data: 'edit_shift:1' },
+                { text: 'Ca 2', callback_data: 'edit_shift:2' },
+                { text: 'Ca 3', callback_data: 'edit_shift:3' }
+            ],
+            [
+                { text: 'Ca 4', callback_data: 'edit_shift:4' },
+                { text: 'Ca 5', callback_data: 'edit_shift:5' }
+            ]
+        ];
+
+        await bot.editMessageText(`Chỉnh sửa cho ${session.member} ngày ${date}\nChọn ca cần chỉnh sửa:`, {
+            chat_id: chatId,
+            message_id: query.message.message_id,
+            reply_markup: {
+                inline_keyboard: shiftKeyboard
+            }
+        });
+    }
+    else if (data.startsWith('edit_shift:')) {
+        const shift = data.split(':')[1];
+        const session = editSessions.get(chatId);
+        session.shift = shift;
+
+        // Ask for ACC input
+        await bot.editMessageText(
+            `Nhập số ACC cho ${session.member} ngày ${session.date} Ca ${shift}\n` +
+            'Trả lời tin nhắn này với số ACC mới:',
+            {
                 chat_id: chatId,
-                message_id: messageId
-            });
+                message_id: query.message.message_id
+            }
+        );
+
+        // Set state to wait for ACC input
+        session.waitingForAcc = true;
+    }
+});
+
+// Step 3: Handle ACC input
+bot.on('message', async (msg) => {
+    const chatId = msg.chat.id;
+    const session = editSessions.get(chatId);
+
+    if (session && session.waitingForAcc) {
+        const acc = parseInt(msg.text);
+        
+        if (isNaN(acc)) {
+            await bot.sendMessage(chatId, 'Vui lòng nhập một số hợp lệ.');
             return;
         }
 
-        if (data.startsWith('e_m:')) {
-            const memberIndex = data.split(':')[1];
-            const memberName = editStates.get(`member_${memberIndex}`);
-            editStates.set(chatId, { ...state, memberName, step: 'date' });
-            
-            await bot.editMessageText('Chọn ngày cần chỉnh sửa:', {
-                chat_id: chatId,
-                message_id: messageId,
-                reply_markup: createDateKeyboard()
-            });
-        }
-        else if (data.startsWith('e_d:')) {
-            const dayIndex = parseInt(data.split(':')[1]);
-            const date = new Date();
-            date.setDate(date.getDate() - dayIndex);
-            const dateStr = date.toLocaleDateString('vi-VN');
-            
-            editStates.set(chatId, { ...state, date: dateStr, step: 'shift' });
-            
-            await bot.editMessageText('Chọn ca cần chỉnh sửa:', {
-                chat_id: chatId,
-                message_id: messageId,
-                reply_markup: createShiftKeyboard()
-            });
-        }
-        else if (data.startsWith('e_s:')) {
-            const shift = data.split(':')[1];
-            editStates.set(chatId, { ...state, shift, step: 'acc' });
-            
-            await bot.editMessageText(`Nhập số ACC cho ${state.memberName}, ngày ${state.date}, Ca ${shift}:`, {
-                chat_id: chatId,
-                message_id: messageId
-            });
-        }
-
-        await bot.answerCallbackQuery(callbackQuery.id);
-    } catch (error) {
-        console.error('Error handling callback query:', error);
-        bot.sendMessage(chatId, 'Có lỗi xảy ra trong quá trình xử lý.');
-    }
-});
-
-// Xử lý nhập số ACC
-bot.on('message', async (msg) => {
-    const chatId = msg.chat.id;
-    const state = editStates.get(chatId);
-
-    if (state && state.step === 'acc') {
-        const acc = parseInt(msg.text);
-        if (isNaN(acc)) {
-            return bot.sendMessage(chatId, 'Vui lòng nhập một số hợp lệ.');
-        }
-
         try {
-            // Chuyển đổi định dạng ngày trước khi cập nhật
-            const formattedDate = convertDateFormat(state.date);
-            
-            console.log('Updating database with:', {
-                groupId: -1002496228650,
-                ten: state.memberName,
-                date: formattedDate,
-                shift: state.shift,
-                acc: acc
-            });
-
-            const result = await Trasua.findOneAndUpdate(
+            // Update the database
+            const updateResult = await Trasua.findOneAndUpdate(
                 {
                     groupId: -1002496228650,
-                    ten: state.memberName,
-                    date: formattedDate
+                    ten: session.member,
+                    date: session.date
                 },
                 {
-                    $set: {
-                        [`caData.Ca${state.shift}`]: acc,
-                        groupId: -1002496228650, // Đảm bảo groupId được set
-                        ten: state.memberName,    // Đảm bảo tên được set
-                        date: formattedDate       // Đảm bảo ngày được set
-                    }
+                    [`caData.Ca${session.shift}`]: acc
                 },
-                { 
-                    upsert: true, 
-                    new: true,
-                    setDefaultsOnInsert: true
-                }
+                { new: true }
             );
 
-            console.log('Database update result:', result);
-
-            if (result) {
-                const message = `Đã cập nhật bảng công:\n` +
-                              `- Tên: ${state.memberName}\n` +
-                              `- Ngày: ${state.date}\n` +
-                              `- Ca ${state.shift}: ${acc} ACC`;
-
-                bot.sendMessage(chatId, message);
+            if (updateResult) {
+                await bot.sendMessage(
+                    chatId,
+                    `Đã cập nhật ACC cho ${session.member} ngày ${session.date} Ca ${session.shift} thành ${acc}`
+                );
             } else {
-                throw new Error('Không thể cập nhật dữ liệu');
+                await bot.sendMessage(
+                    chatId,
+                    'Không tìm thấy bảng công phù hợp để cập nhật.'
+                );
             }
-
-            editStates.delete(chatId);
         } catch (error) {
-            console.error('Error updating attendance:', error);
-            bot.sendMessage(chatId, 'Có lỗi xảy ra khi cập nhật bảng công. Chi tiết lỗi: ' + error.message);
+            await bot.sendMessage(
+                chatId,
+                'Có lỗi xảy ra khi cập nhật dữ liệu.'
+            );
+            console.error(error);
         }
+
+        // Clear session
+        editSessions.delete(chatId);
     }
 });
-
 
 
 
