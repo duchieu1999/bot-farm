@@ -1082,25 +1082,13 @@ bot.on('callback_query', async (query) => {
             }
         });
     }
-   // Inside the callback query handler, modify the edit_shift section:
-else if (data.startsWith('edit_shift:')) {
-    state.shift = parseInt(data.split(':')[1]);
-    editState.set(chatId, state);
-    
-    // Fetch current ACC value
-    try {
-        const currentRecord = await Trasua.findOne({
-            groupId: -1002496228650,
-            ten: state.member,
-            date: state.date
-        });
-
-        const currentAcc = currentRecord?.caData?.[`Ca${state.shift}`] || 0;
-
+ else if (data.startsWith('edit_shift:')) {
+        state.shift = parseInt(data.split(':')[1]);
+        editState.set(chatId, state);
+        
         await bot.editMessageText(
-            `Đã chọn thành viên ${state.member} - Ngày ${state.date} - Ca ${state.shift}\n` +
-            `Số ACC hiện tại: ${currentAcc}\n` +
-            'Vui lòng nhập số ACC mới cho thành viên này:',
+            `Nhập số ACC cho ${state.member} - Ngày ${state.date} - Ca ${state.shift}\n` +
+            'Trả lời tin nhắn này với số ACC mới:',
             {
                 chat_id: chatId,
                 message_id: messageId
@@ -1110,22 +1098,8 @@ else if (data.startsWith('edit_shift:')) {
         // Đặt bot vào chế độ đợi nhập ACC
         state.waitingForAcc = true;
         editState.set(chatId, state);
-    } catch (error) {
-        await bot.editMessageText(
-            '❌ Có lỗi khi tải dữ liệu ACC hiện tại.\n' +
-            `Thành viên ${state.member} - Ngày ${state.date} - Ca ${state.shift}\n` +
-            `Số ACC hiện tại: ${currentAcc}\n` +
-            'Vui lòng nhập số ACC mới cho thành viên này:',
-            {
-                chat_id: chatId,
-                message_id: messageId
-            }
-        );
-        
-        state.waitingForAcc = true;
-        editState.set(chatId, state);
     }
-}
+});
 
 // Xử lý nhập ACC
 bot.on('message', async (msg) => {
