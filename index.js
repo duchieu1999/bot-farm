@@ -975,7 +975,7 @@ async function getMembers(groupId) {
 }
 
 // Tương tác chỉnh sửa bảng công
-bot.onText(/\/editbangcong/, async (msg) => {
+bot.onText(/\/editbc/, async (msg) => {
     const chatId = msg.chat.id;
 
     // Lấy danh sách thành viên
