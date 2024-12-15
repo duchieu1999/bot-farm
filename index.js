@@ -976,7 +976,7 @@ async function getMemberKeyboard(chatId) {
     const uniqueMembers = await Trasua.distinct('ten', { groupId: -1002496228650 });
     const keyboard = [];
     const rowSize = 2;
-    
+
     for (let i = 0; i < uniqueMembers.length; i += rowSize) {
         const row = uniqueMembers.slice(i, i + rowSize).map(member => ({
             text: member,
@@ -984,7 +984,7 @@ async function getMemberKeyboard(chatId) {
         }));
         keyboard.push(row);
     }
-    
+
     keyboard.push([{ text: '❌ Hủy', callback_data: 'edit_cancel' }]);
     return keyboard;
 }
@@ -997,12 +997,12 @@ function getDateKeyboard() {
         date.setDate(date.getDate() - i);
         dates.push(date.toLocaleDateString());
     }
-    
+
     const keyboard = dates.map(date => ([{
         text: date,
         callback_data: `edit_date:${date}`
     }]));
-    
+
     keyboard.push([{ text: '❌ Hủy', callback_data: 'edit_cancel' }]);
     return keyboard;
 }
@@ -1029,10 +1029,10 @@ function getShiftKeyboard() {
 // Khởi động quá trình chỉnh sửa
 bot.onText(/\/editbc/, async (msg) => {
     const chatId = msg.chat.id;
-    
+
     // Xóa trạng thái chỉnh sửa cũ nếu có
     editState.delete(chatId);
-    
+
     const keyboard = await getMemberKeyboard(chatId);
     bot.sendMessage(chatId, '👥 Chọn thành viên cần chỉnh sửa:', {
         reply_markup: {
@@ -1061,7 +1061,7 @@ bot.on('callback_query', async (query) => {
     if (data.startsWith('edit_member:')) {
         state.member = data.split(':')[1];
         editState.set(chatId, state);
-        
+
         await bot.editMessageText('📅 Chọn ngày cần chỉnh sửa:', {
             chat_id: chatId,
             message_id: messageId,
@@ -1069,11 +1069,10 @@ bot.on('callback_query', async (query) => {
                 inline_keyboard: getDateKeyboard()
             }
         });
-    }
-    else if (data.startsWith('edit_date:')) {
+    } else if (data.startsWith('edit_date:')) {
         state.date = data.split(':')[1];
         editState.set(chatId, state);
-        
+
         await bot.editMessageText('⏰ Chọn ca cần chỉnh sửa:', {
             chat_id: chatId,
             message_id: messageId,
@@ -1081,41 +1080,51 @@ bot.on('callback_query', async (query) => {
                 inline_keyboard: getShiftKeyboard()
             }
         });
-    }
- else if (data.startsWith('edit_shift:')) {
+    } else if (data.startsWith('edit_shift:')) {
         state.shift = parseInt(data.split(':')[1]);
+
+        // Lấy dữ liệu hiện tại của thành viên
+        const memberData = await Trasua.findOne({
+            groupId: -1002496228650,
+            ten: state.member,
+            date: state.date
+        });
+
+        state.currentAcc = memberData?.caData[`Ca${state.shift}`] || 0;
+        state.currentPosts = memberData?.postCount || 0;
         editState.set(chatId, state);
-        
+
         await bot.editMessageText(
-            `Nhập số ACC cho ${state.member} - Ngày ${state.date} - Ca ${state.shift}\n` +
-            'Trả lời tin nhắn này với số ACC mới:',
+            `Nhập số ACC và số bài đăng mới cho ${state.member} - Ngày ${state.date} - Ca ${state.shift}\n` +
+            `Hiện tại: 🔢 ACC: ${state.currentAcc}, 📝 Bài đăng: ${state.currentPosts}\n` +
+            `Cú pháp để sửa: số acc, số bài đăng (ví dụ: 6, 12) Lưu ý: Sẽ gán bằng số đã nhập chứ không trừ hay cộng dồn`,
             {
                 chat_id: chatId,
                 message_id: messageId
             }
         );
-        
-        // Đặt bot vào chế độ đợi nhập ACC
-        state.waitingForAcc = true;
+
+        // Đặt bot vào chế độ đợi nhập thông tin mới
+        state.waitingForInput = true;
         editState.set(chatId, state);
     }
 });
 
-// Xử lý nhập ACC
+// Xử lý nhập ACC và bài đăng
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const state = editState.get(chatId);
-    
-    if (!state || !state.waitingForAcc) return;
-    
-    const accValue = parseInt(msg.text);
-    if (isNaN(accValue)) {
-        bot.sendMessage(chatId, '❌ Vui lòng nhập một số hợp lệ');
+
+    if (!state || !state.waitingForInput) return;
+
+    const [accValue, postValue] = msg.text.split(',').map(v => parseInt(v.trim()));
+    if (isNaN(accValue) || isNaN(postValue)) {
+        bot.sendMessage(chatId, '❌ Vui lòng nhập đúng định dạng: acc,số bài đăng');
         return;
     }
 
     try {
-        // Cập nhật ACC trong database
+        // Cập nhật dữ liệu vào database
         const updateResult = await Trasua.findOneAndUpdate(
             {
                 groupId: -1002496228650,
@@ -1123,7 +1132,9 @@ bot.on('message', async (msg) => {
                 date: state.date
             },
             {
-                [`caData.Ca${state.shift}`]: accValue
+                [`caData.Ca${state.shift}`]: accValue,
+                postCount: postValue,
+                salary: accValue * 5000 + postValue * 1000
             },
             { new: true }
         );
@@ -1135,7 +1146,8 @@ bot.on('message', async (msg) => {
                 `👤 ${state.member}\n` +
                 `📅 ${state.date}\n` +
                 `⏰ Ca ${state.shift}\n` +
-                `🔢 ACC: ${accValue}`
+                `🔢 ACC: ${accValue}, 📝 Bài đăng: ${postValue}\n` +
+                `💰 Tiền công: ${updateResult.salary.toLocaleString()} VNĐ`
             );
         } else {
             bot.sendMessage(chatId, '❌ Không tìm thấy bảng công phù hợp để cập nhật');
@@ -1147,6 +1159,7 @@ bot.on('message', async (msg) => {
     // Xóa trạng thái chỉnh sửa
     editState.delete(chatId);
 });
+
 
 
 
