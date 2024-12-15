@@ -1719,7 +1719,11 @@ async function processSubmission(msg, targetMsg) {
     case -1002383656659:
       pricePerKeo = 1000;
       pricePerQuay = 350;
-      break;   
+      break;
+    case -1002496228650:
+      pricePerKeo = 1000;
+      pricePerQuay = 250;
+      break;
     default:
       pricePerKeo = 1000;
       pricePerQuay = 500;
@@ -2247,6 +2251,7 @@ const kickbot = {
   "-1002143712364": "CÙNG NHAU CHIA SẺ",
   "-1002246062598": "guyi",
   "-1002278963130": "gugugu",
+  "-1002496228650": "dfdfmdlf",
   "-1002122969493": "ugugi",
   "-1002094623131": "GUGID",
   "-1002317530934": "yuighu",
