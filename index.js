@@ -972,7 +972,7 @@ bot.onText(/\/444/, async (msg) => {
 const editState = new Map();
 
 // Hàm chuẩn hóa tên
-function normalizeName(name) {
+function normalizeName2(name) {
     return name.trim();
 }
 
@@ -1190,7 +1190,7 @@ bot.on('message', async (msg) => {
 
     try {
         // Normalize member name when querying
-        const normalizedMember = normalizeName(state.member);
+        const normalizedMember = normalizeName2(state.member);
         
         // Fetch current record
         let currentRecord = await Trasua.findOne({
