@@ -976,6 +976,18 @@ function normalizeName2(name) {
     return name.trim();
 }
 
+// Hàm chuẩn hóa tên để dùng trong callback data
+function normalizeNameForCallback(name) {
+    // Loại bỏ các ký tự đặc biệt và rút gọn tên
+    return name.replace(/[^\w\s]/g, '').trim().substring(0, 20);
+}
+
+// Hàm khôi phục tên đầy đủ từ tên đã chuẩn hóa
+async function getFullNameFromNormalized(normalizedName, chatId) {
+    const members = await Trasua.distinct('ten', { groupId: -1002496228650 });
+    return members.find(member => normalizeNameForCallback(member) === normalizedName);
+}
+
 // Sửa trong hàm getMemberKeyboard
 async function getMemberKeyboard(chatId) {
     const uniqueMembers = await Trasua.distinct('ten', { groupId: -1002496228650 });
@@ -985,7 +997,7 @@ async function getMemberKeyboard(chatId) {
     for (let i = 0; i < uniqueMembers.length; i += rowSize) {
         const row = uniqueMembers.slice(i, i + rowSize).map(member => ({
             text: member,
-            callback_data: `edit_member:${encodeURIComponent(member.substring(0, 20))}` // Mã hóa tên
+            callback_data: `edit_member:${normalizeNameForCallback(member)}` // Sử dụng tên đã chuẩn hóa
         }));
         keyboard.push(row);
     }
@@ -1058,7 +1070,7 @@ bot.onText(/\/editbc/, async (msg) => {
     });
 });
 
-// Xử lý các callback query
+// Sửa trong phần xử lý callback query
 bot.on('callback_query', async (query) => {
     const chatId = query.message.chat.id;
     const messageId = query.message.message_id;
@@ -1076,7 +1088,8 @@ bot.on('callback_query', async (query) => {
     let state = editState.get(chatId) || {};
 
     if (data.startsWith('edit_member:')) {
-        state.member = decodeURIComponent(data.split(':')[1]); // Giải mã tên
+        const normalizedName = data.split(':')[1];
+        state.member = await getFullNameFromNormalized(normalizedName, chatId); // Khôi phục tên đầy đủ
         editState.set(chatId, state);
         
         await bot.editMessageText('📅 Chọn ngày cần chỉnh sửa:', {
