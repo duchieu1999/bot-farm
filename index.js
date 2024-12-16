@@ -971,7 +971,12 @@ bot.onText(/\/444/, async (msg) => {
 // Lưu trạng thái chỉnh sửa tạm thời
 const editState = new Map();
 
-// Hàm tạo keyboard cho danh sách thành viên
+// Hàm chuẩn hóa tên
+function normalizeName(name) {
+    return name.trim();
+}
+
+// Sửa trong hàm getMemberKeyboard
 async function getMemberKeyboard(chatId) {
     const uniqueMembers = await Trasua.distinct('ten', { groupId: -1002496228650 });
     const keyboard = [];
@@ -980,7 +985,7 @@ async function getMemberKeyboard(chatId) {
     for (let i = 0; i < uniqueMembers.length; i += rowSize) {
         const row = uniqueMembers.slice(i, i + rowSize).map(member => ({
             text: member,
-            callback_data: `edit_member:${member.substring(0, 20)}` // Giới hạn độ dài
+            callback_data: `edit_member:${encodeURIComponent(member.substring(0, 20))}` // Mã hóa tên
         }));
         keyboard.push(row);
     }
@@ -1071,7 +1076,7 @@ bot.on('callback_query', async (query) => {
     let state = editState.get(chatId) || {};
 
     if (data.startsWith('edit_member:')) {
-        state.member = data.split(':')[1];
+        state.member = decodeURIComponent(data.split(':')[1]); // Giải mã tên
         editState.set(chatId, state);
         
         await bot.editMessageText('📅 Chọn ngày cần chỉnh sửa:', {
@@ -1184,10 +1189,13 @@ bot.on('message', async (msg) => {
     }
 
     try {
+        // Normalize member name when querying
+        const normalizedMember = normalizeName(state.member);
+        
         // Fetch current record
         let currentRecord = await Trasua.findOne({
             groupId: -1002496228650,
-            ten: state.member,
+            ten: normalizedMember,
             date: state.date
         });
 
@@ -1215,11 +1223,11 @@ bot.on('message', async (msg) => {
         // Thêm tinh_tien vào updateQuery
         updateQuery.tinh_tien = tinh_tien;
 
-        // Update database with new values
+        // Update database with new values using normalized name
         const updateResult = await Trasua.findOneAndUpdate(
             {
                 groupId: -1002496228650,
-                ten: state.member,
+                ten: normalizedMember,
                 date: state.date
             },
             {
