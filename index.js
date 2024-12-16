@@ -997,7 +997,8 @@ async function getMemberKeyboard(chatId) {
     for (let i = 0; i < uniqueMembers.length; i += rowSize) {
         const row = uniqueMembers.slice(i, i + rowSize).map(member => ({
             text: member,
-            callback_data: `edit_member:${normalizeNameForCallback(member)}` // Sử dụng tên đã chuẩn hóa
+            // Sử dụng Base64 để mã hóa tên thành viên trong callback_data
+            callback_data: `edit_member:${Buffer.from(member).toString('base64')}`
         }));
         keyboard.push(row);
     }
@@ -1005,7 +1006,6 @@ async function getMemberKeyboard(chatId) {
     keyboard.push([{ text: '❌ Hủy', callback_data: 'edit_cancel' }]);
     return keyboard;
 }
-
 // Hàm tạo keyboard cho chọn ngày
 function getDateKeyboard() {
     const dates = [];
@@ -1088,8 +1088,9 @@ bot.on('callback_query', async (query) => {
     let state = editState.get(chatId) || {};
 
     if (data.startsWith('edit_member:')) {
-        const normalizedName = data.split(':')[1];
-        state.member = await getFullNameFromNormalized(normalizedName, chatId); // Khôi phục tên đầy đủ
+        // Giải mã Base64 để lấy tên thành viên đầy đủ
+        const memberBase64 = data.split(':')[1];
+        state.member = Buffer.from(memberBase64, 'base64').toString();
         editState.set(chatId, state);
         
         await bot.editMessageText('📅 Chọn ngày cần chỉnh sửa:', {
@@ -1100,6 +1101,7 @@ bot.on('callback_query', async (query) => {
             }
         });
     }
+
     else if (data.startsWith('edit_date:')) {
         state.date = data.split(':')[1];
         editState.set(chatId, state);
