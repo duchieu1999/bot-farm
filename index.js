@@ -971,24 +971,7 @@ bot.onText(/\/444/, async (msg) => {
 // Lưu trạng thái chỉnh sửa tạm thời
 const editState = new Map();
 
-// Hàm chuẩn hóa tên
-function normalizeName2(name) {
-    return name.trim();
-}
-
-// Hàm chuẩn hóa tên để dùng trong callback data
-function normalizeNameForCallback(name) {
-    // Loại bỏ các ký tự đặc biệt và rút gọn tên
-    return name.replace(/[^\w\s]/g, '').trim().substring(0, 20);
-}
-
-// Hàm khôi phục tên đầy đủ từ tên đã chuẩn hóa
-async function getFullNameFromNormalized(normalizedName, chatId) {
-    const members = await Trasua.distinct('ten', { groupId: -1002496228650 });
-    return members.find(member => normalizeNameForCallback(member) === normalizedName);
-}
-
-// Sửa trong hàm getMemberKeyboard
+// Hàm tạo keyboard cho danh sách thành viên
 async function getMemberKeyboard(chatId) {
     const uniqueMembers = await Trasua.distinct('ten', { groupId: -1002496228650 });
     const keyboard = [];
@@ -997,7 +980,7 @@ async function getMemberKeyboard(chatId) {
     for (let i = 0; i < uniqueMembers.length; i += rowSize) {
         const row = uniqueMembers.slice(i, i + rowSize).map(member => ({
             text: member,
-            // Sử dụng Base64 để mã hóa tên thành viên trong callback_data
+            // Mã hóa tên thành viên thành base64 để tránh ký tự đặc biệt
             callback_data: `edit_member:${Buffer.from(member).toString('base64')}`
         }));
         keyboard.push(row);
@@ -1006,6 +989,8 @@ async function getMemberKeyboard(chatId) {
     keyboard.push([{ text: '❌ Hủy', callback_data: 'edit_cancel' }]);
     return keyboard;
 }
+
+
 // Hàm tạo keyboard cho chọn ngày
 function getDateKeyboard() {
     const dates = [];
@@ -1070,7 +1055,7 @@ bot.onText(/\/editbc/, async (msg) => {
     });
 });
 
-// Sửa trong phần xử lý callback query
+// Xử lý các callback query
 bot.on('callback_query', async (query) => {
     const chatId = query.message.chat.id;
     const messageId = query.message.message_id;
@@ -1088,20 +1073,28 @@ bot.on('callback_query', async (query) => {
     let state = editState.get(chatId) || {};
 
     if (data.startsWith('edit_member:')) {
-        // Giải mã Base64 để lấy tên thành viên đầy đủ
-        const memberBase64 = data.split(':')[1];
-        state.member = Buffer.from(memberBase64, 'base64').toString();
-        editState.set(chatId, state);
-        
-        await bot.editMessageText('📅 Chọn ngày cần chỉnh sửa:', {
-            chat_id: chatId,
-            message_id: messageId,
-            reply_markup: {
-                inline_keyboard: getDateKeyboard()
-            }
-        });
+        try {
+            // Giải mã tên thành viên từ base64
+            const memberBase64 = data.split(':')[1];
+            state.member = Buffer.from(memberBase64, 'base64').toString();
+            editState.set(chatId, state);
+            
+            await bot.editMessageText('📅 Chọn ngày cần chỉnh sửa:', {
+                chat_id: chatId,
+                message_id: messageId,
+                reply_markup: {
+                    inline_keyboard: getDateKeyboard()
+                }
+            });
+        } catch (error) {
+            console.error('Lỗi giải mã tên thành viên:', error);
+            await bot.editMessageText('❌ Có lỗi xảy ra khi chọn thành viên', {
+                chat_id: chatId,
+                message_id: messageId
+            });
+            editState.delete(chatId);
+        }
     }
-
     else if (data.startsWith('edit_date:')) {
         state.date = data.split(':')[1];
         editState.set(chatId, state);
@@ -1204,24 +1197,10 @@ bot.on('message', async (msg) => {
     }
 
     try {
-        // Normalize member name when querying
-        const normalizedMember = normalizeName2(state.member);
-        
-        // Fetch current record
-        let currentRecord = await Trasua.findOne({
-            groupId: -1002496228650,
-            ten: normalizedMember,
-            date: state.date
-        });
-
         let updateQuery;
         if (state.waitingForAcc) {
-            // Tạo hoặc cập nhật caData
-            const caData = currentRecord?.caData || {};
-            caData[`Ca${state.shift}`] = newValue;
-            
             updateQuery = {
-                caData: caData
+                [`caData.Ca${state.shift}`]: newValue
             };
         } else {
             updateQuery = {
@@ -1229,24 +1208,32 @@ bot.on('message', async (msg) => {
             };
         }
 
+        // Fetch current record
+        const currentRecord = await Trasua.findOne({
+            groupId: -1002496228650,
+            ten: state.member,
+            date: state.date
+        });
+
         // Calculate new total
-        const totalAcc = Object.values(updateQuery.caData || currentRecord?.caData || {})
-            .reduce((sum, acc) => sum + (acc || 0), 0);
+        const caData = state.waitingForAcc ? 
+            { ...currentRecord?.caData || {}, [`Ca${state.shift}`]: newValue } :
+            currentRecord?.caData || {};
+        
+        const totalAcc = Object.values(caData).reduce((sum, acc) => sum + (acc || 0), 0);
         const totalPosts = state.waitingForPost ? newValue : (currentRecord?.post || 0);
         const tinh_tien = (totalAcc * 5000) + (totalPosts * 1000);
 
-        // Thêm tinh_tien vào updateQuery
-        updateQuery.tinh_tien = tinh_tien;
-
-        // Update database with new values using normalized name
+        // Update database with new values
         const updateResult = await Trasua.findOneAndUpdate(
             {
                 groupId: -1002496228650,
-                ten: normalizedMember,
+                ten: state.member,
                 date: state.date
             },
             {
-                $set: updateQuery
+                ...updateQuery,
+                tinh_tien
             },
             { new: true, upsert: true }
         );
@@ -1271,7 +1258,6 @@ bot.on('message', async (msg) => {
     // Xóa trạng thái chỉnh sửa
     editState.delete(chatId);
 });
-
 
 
 
