@@ -1184,10 +1184,21 @@ bot.on('message', async (msg) => {
     }
 
     try {
+        // Fetch current record
+        let currentRecord = await Trasua.findOne({
+            groupId: -1002496228650,
+            ten: state.member,
+            date: state.date
+        });
+
         let updateQuery;
         if (state.waitingForAcc) {
+            // Tạo hoặc cập nhật caData
+            const caData = currentRecord?.caData || {};
+            caData[`Ca${state.shift}`] = newValue;
+            
             updateQuery = {
-                [`caData.Ca${state.shift}`]: newValue
+                caData: caData
             };
         } else {
             updateQuery = {
@@ -1195,21 +1206,14 @@ bot.on('message', async (msg) => {
             };
         }
 
-        // Fetch current record
-        const currentRecord = await Trasua.findOne({
-            groupId: -1002496228650,
-            ten: state.member,
-            date: state.date
-        });
-
         // Calculate new total
-        const caData = state.waitingForAcc ? 
-            { ...currentRecord?.caData || {}, [`Ca${state.shift}`]: newValue } :
-            currentRecord?.caData || {};
-        
-        const totalAcc = Object.values(caData).reduce((sum, acc) => sum + (acc || 0), 0);
+        const totalAcc = Object.values(updateQuery.caData || currentRecord?.caData || {})
+            .reduce((sum, acc) => sum + (acc || 0), 0);
         const totalPosts = state.waitingForPost ? newValue : (currentRecord?.post || 0);
         const tinh_tien = (totalAcc * 5000) + (totalPosts * 1000);
+
+        // Thêm tinh_tien vào updateQuery
+        updateQuery.tinh_tien = tinh_tien;
 
         // Update database with new values
         const updateResult = await Trasua.findOneAndUpdate(
@@ -1219,8 +1223,7 @@ bot.on('message', async (msg) => {
                 date: state.date
             },
             {
-                ...updateQuery,
-                tinh_tien
+                $set: updateQuery
             },
             { new: true, upsert: true }
         );
