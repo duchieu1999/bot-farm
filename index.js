@@ -578,12 +578,15 @@ const caRegex = /ca\s*(11h30|13h30|15h|18h30|20h)/gi;
 // Regex để tìm bài đăng (chỉ số và chữ "b" hợp lệ)
 const postRegex = /^\s*(\d+)\s*[bB]\s*$/gi;
 
+// Danh sách các groupId được xử lý
+const allowedGroupIds3 = [-1002496228650, -1002386470970];
+
 // Xử lý sự kiện tin nhắn
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
 
-  // Chỉ xử lý tin nhắn trong nhóm cụ thể
-  if (chatId == -1002496228650) {
+  // Chỉ xử lý tin nhắn trong các nhóm cụ thể
+  if (allowedGroupIds3.includes(chatId)) {
     const messageContent = msg.text || msg.caption;
     if (messageContent) {
       // Kiểm tra nếu tin nhắn chứa từ "bỏ"
@@ -603,12 +606,11 @@ bot.on('message', async (msg) => {
         await processPostSubmission(msg, postMatches); // Xử lý bài đăng
       } else {
         // Thông báo lỗi cú pháp
-        
+        await bot.sendMessage(chatId, "Lỗi cú pháp, vui lòng kiểm tra lại tin nhắn.");
       }
     }
   }
 });
-
 // Hàm xử lý bài nộp số acc
 async function processAccSubmission(msg, accMatches, caMatches) {
   const userId = msg.from.id;
@@ -1841,10 +1843,6 @@ async function processSubmission(msg, targetMsg) {
     case -1002383656659:
       pricePerKeo = 1000;
       pricePerQuay = 350;
-      break;
-    case -1002386470970:
-      pricePerKeo = 1000;
-      pricePerQuay = 250;
       break;
     default:
       pricePerKeo = 1000;
