@@ -578,15 +578,12 @@ const caRegex = /ca\s*(11h30|13h30|15h|18h30|20h)/gi;
 // Regex để tìm bài đăng (chỉ số và chữ "b" hợp lệ)
 const postRegex = /^\s*(\d+)\s*[bB]\s*$/gi;
 
-// Danh sách các groupId được xử lý
-const allowedGroupIds3 = [-1002496228650, -1002386470970];
-
 // Xử lý sự kiện tin nhắn
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
 
-  // Chỉ xử lý tin nhắn trong các nhóm cụ thể
-  if (allowedGroupIds3.includes(chatId)) {
+  // Chỉ xử lý tin nhắn trong nhóm cụ thể
+  if (chatId == -1002496228650 || chatId == -1002386470970) {
     const messageContent = msg.text || msg.caption;
     if (messageContent) {
       // Kiểm tra nếu tin nhắn chứa từ "bỏ"
@@ -606,7 +603,7 @@ bot.on('message', async (msg) => {
         await processPostSubmission(msg, postMatches); // Xử lý bài đăng
       } else {
         // Thông báo lỗi cú pháp
-        await bot.sendMessage(chatId, "Lỗi cú pháp, vui lòng kiểm tra lại tin nhắn.");
+        
       }
     }
   }
