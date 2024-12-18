@@ -574,7 +574,7 @@ async function processAccMessage4(msg) {
 
 // Regex để tìm số acc và ca
 const accRegex = /(\d+)\s*[^a-zA-Z\d]*acc\b/gi;
-const caRegex = /ca\s*(11h30|13h30|15h|18h30|20h)/gi;
+const caRegex = /ca\s*(10h|11h30|13h30|15h|18h30|20h)/gi;
 
 // Regex để tìm bài đăng (chỉ số và chữ "b" hợp lệ)
 const postRegex = /^\s*(\d+)\s*[bB]\s*$/gi;
@@ -741,7 +741,7 @@ async function processPostSubmission(msg, postMatches) {
 // Hàm ánh xạ giờ thành khóa ca
 function mapCaHourToKey(hour) {
   switch (hour) {
-    case '10h00':
+    case '10h':
       return 'Ca1';
     case '11h30':
       return 'Ca2';
