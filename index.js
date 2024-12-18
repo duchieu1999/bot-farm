@@ -847,7 +847,7 @@ async function processAccMessage7(msg) {
 
 
 
-async function generateReport(bot, chatId, days) {
+async function generateReport(bot, chatId, days, groupId) {
   const dates = [];
   for (let i = 0; i < days; i++) {
     const date = new Date();
@@ -855,14 +855,14 @@ async function generateReport(bot, chatId, days) {
     dates.push(date.toLocaleDateString());
   }
 
-  const groupName = 'BẢNG CÔNG NHÓM 5K';
+  const groupName = groupId === -1002386470970 ? 'BẢNG CÔNG NHÓM 444' : 'BẢNG CÔNG NHÓM 333';
   const url = 'https://quickchart.io/graphviz?format=png&layout=dot&graph=';
   let grandTotal = 0;
-  const memberSummary = {}; // Tổng hợp dữ liệu từng thành viên
+  const memberSummary = {};
   const dailyImages = [];
 
   for (const dateStr of dates) {
-    const bangCongList = await Trasua.find({ groupId: -1002496228650, date: dateStr });
+    const bangCongList = await Trasua.find({ groupId, date: dateStr });
 
     if (bangCongList.length === 0) {
       bot.sendMessage(chatId, `Chưa có bảng công nào được ghi nhận trong ngày ${dateStr}.`);
@@ -875,7 +875,6 @@ async function generateReport(bot, chatId, days) {
       const { caData = {}, post = 0, acc = 0, tinh_tien, ten } = entry;
       const ca = [caData.Ca1, caData.Ca2, caData.Ca3, caData.Ca4, caData.Ca5].map(ca => ca > 0 ? ca : '-');
       
-      // Cập nhật dữ liệu tổng hợp từng thành viên
       if (!memberSummary[ten]) {
         memberSummary[ten] = { acc: 0, posts: 0, total: 0 };
       }
@@ -923,7 +922,6 @@ async function generateReport(bot, chatId, days) {
     });
   }
 
-  // Bảng tổng kết tổng tiền
   const summaryContent = Object.entries(memberSummary)
     .map(([name, data]) => `<TR><TD>${name}</TD><TD>${data.acc}</TD><TD>${data.posts}</TD><TD>${data.total.toLocaleString()} vnđ</TD></TR>`)
     .join('');
@@ -955,14 +953,17 @@ async function generateReport(bot, chatId, days) {
 // Lệnh /333
 bot.onText(/\/333/, async (msg) => {
   const chatId = msg.chat.id;
-  await generateReport(bot, chatId, 3);
+  const groupId = -1002496228650; // Group ID cho lệnh /333
+  await generateReport(bot, chatId, 3, groupId);
 });
 
 // Lệnh /444
 bot.onText(/\/444/, async (msg) => {
   const chatId = msg.chat.id;
-  await generateReport(bot, chatId, 4);
+  const groupId = -1002386470970; // Group ID cho lệnh /444
+  await generateReport(bot, chatId, 3, groupId);
 });
+
 
 
 
