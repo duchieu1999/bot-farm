@@ -52,6 +52,7 @@ const trasuaSchema = new mongoose.Schema({
     Ca3: { type: Number, default: 0 }, // Acc trong Ca 3 (15h00)
     Ca4: { type: Number, default: 0 }, // Acc trong Ca 4 (18h30)
     Ca5: { type: Number, default: 0 }, // Acc trong Ca 5 (20h00)
+    Ca6: { type: Number, default: 0 },
   },
 }, { minimize: false, timestamps: true }); // Timestamps thêm vào để dễ dàng quản lý thời gian
 
@@ -740,16 +741,18 @@ async function processPostSubmission(msg, postMatches) {
 // Hàm ánh xạ giờ thành khóa ca
 function mapCaHourToKey(hour) {
   switch (hour) {
-    case '11h30':
+    case '10h00':
       return 'Ca1';
-    case '13h30':
+    case '11h30':
       return 'Ca2';
-    case '15h':
+    case '13h30':
       return 'Ca3';
-    case '18h30':
+    case '15h':
       return 'Ca4';
-    case '20h':
+    case '18h30':
       return 'Ca5';
+    case '20h':
+      return 'Ca6';
     default:
       return 'Unknown';
   }
@@ -855,7 +858,7 @@ async function generateReport(bot, chatId, days, groupId) {
     dates.push(date.toLocaleDateString());
   }
 
-  const groupName = groupId === -1002386470970 ? 'BẢNG CÔNG NHÓM 444' : 'BẢNG CÔNG NHÓM 333';
+  const groupName = groupId === -1002386470970 ? 'BẢNG CÔNG NHÓM 5k 2' : 'BẢNG CÔNG NHÓM 5k 1';
   const url = 'https://quickchart.io/graphviz?format=png&layout=dot&graph=';
   let grandTotal = 0;
   const memberSummary = {};
@@ -873,7 +876,7 @@ async function generateReport(bot, chatId, days, groupId) {
 
     let content = bangCongList.map(entry => {
       const { caData = {}, post = 0, acc = 0, tinh_tien, ten } = entry;
-      const ca = [caData.Ca1, caData.Ca2, caData.Ca3, caData.Ca4, caData.Ca5].map(ca => ca > 0 ? ca : '-');
+      const ca = [caData.Ca1, caData.Ca2, caData.Ca3, caData.Ca4, caData.Ca5, caData.Ca6].map(ca => ca > 0 ? ca : '-');
       
       if (!memberSummary[ten]) {
         memberSummary[ten] = { acc: 0, posts: 0, total: 0 };
@@ -898,7 +901,7 @@ async function generateReport(bot, chatId, days, groupId) {
           <TABLE BORDER="2" CELLBORDER="1" CELLSPACING="0" CELLPADDING="8" STYLE="font-family: 'Montserrat', sans-serif; border: 3px solid black;">
             <TR><TD COLSPAN="9" ALIGN="CENTER" BGCOLOR="#1976D2" STYLE="font-size: 26px; font-weight: bold; color: white;">${groupName}<FONT POINT-SIZE="20">${dateStr}</FONT></TD></TR>
             <TR STYLE="background-color: #2196F3; color: white; font-weight: bold;">
-              <TD>Tên</TD><TD>CA 1</TD><TD>CA 2</TD><TD>CA 3</TD><TD>CA 4</TD><TD>CA 5</TD><TD>Bài Đăng</TD><TD>Tổng ACC</TD><TD>Tiền Công</TD>
+              <TD>Tên</TD><TD>CA 1</TD><TD>CA 2</TD><TD>CA 3</TD><TD>CA 4</TD><TD>CA 5</TD><TD>CA 6</TD><TD>Bài Đăng</TD><TD>Tổng ACC</TD><TD>Tiền Công</TD>
             </TR>
             ${content.split('\n').map(line => `<TR><TD>${line.split('\t').join('</TD><TD>')}</TD></TR>`).join('')}
             <TR STYLE="background-color: #2196F3; color: white; font-weight: bold;">
