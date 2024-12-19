@@ -976,7 +976,7 @@ const crypto = require('crypto');
 // Lưu trạng thái chỉnh sửa tạm thời
 const editState = new Map();
 
-/ Hàm tạo keyboard cho danh sách thành viên
+// Hàm tạo keyboard cho danh sách thành viên
 async function getMemberKeyboard(chatId, groupId) {
     const uniqueMembers = await Trasua.distinct('ten', { groupId });
     const keyboard = [];
