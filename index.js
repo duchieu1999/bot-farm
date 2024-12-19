@@ -973,12 +973,15 @@ bot.onText(/\/444/, async (msg) => {
 
 const crypto = require('crypto');
 
-// Lưu trạng thái chỉnh sửa tạm thời
 const editState = new Map();
 
-// Hàm tạo keyboard cho danh sách thành viên
+const GROUPS = {
+    'bin': -1002496228650,
+    'doris': -1002386470970
+};
+
 async function getMemberKeyboard(chatId, groupId) {
-    const uniqueMembers = await Trasua.distinct('ten', { groupId });
+    const uniqueMembers = await Trasua.distinct('ten', { groupId: groupId });
     const keyboard = [];
     const rowSize = 2;
 
@@ -997,7 +1000,6 @@ async function getMemberKeyboard(chatId, groupId) {
     return keyboard;
 }
 
-// Hàm tạo keyboard cho chọn ngày
 function getDateKeyboard() {
     const dates = [];
     for (let i = 0; i < 7; i++) {
@@ -1015,7 +1017,6 @@ function getDateKeyboard() {
     return keyboard;
 }
 
-// Hàm tạo keyboard cho chọn loại chỉnh sửa
 function getEditTypeKeyboard() {
     const keyboard = [
         [
@@ -1027,7 +1028,6 @@ function getEditTypeKeyboard() {
     return keyboard;
 }
 
-// Hàm tạo keyboard cho chọn ca
 function getShiftKeyboard() {
     const keyboard = [
         [
@@ -1047,42 +1047,41 @@ function getShiftKeyboard() {
     return keyboard;
 }
 
-// Khởi động quá trình chỉnh sửa
+// Xử lý lệnh /editbin
 bot.onText(/\/editbin/, async (msg) => {
     const chatId = msg.chat.id;
-    const groupId = -1002496228650; // GroupId cho editbin
-
     editState.delete(chatId);
-
-    const keyboard = await getMemberKeyboard(chatId, groupId);
-    bot.sendMessage(chatId, '👥 Chọn thành viên cần chỉnh sửa:', {
+    const state = { groupId: GROUPS.bin };
+    editState.set(chatId, state);
+    
+    const keyboard = await getMemberKeyboard(chatId, GROUPS.bin);
+    bot.sendMessage(chatId, '👥 Chọn thành viên BIN cần chỉnh sửa:', {
         reply_markup: {
             inline_keyboard: keyboard
         }
     });
 });
 
+// Xử lý lệnh /editdoris
 bot.onText(/\/editdoris/, async (msg) => {
     const chatId = msg.chat.id;
-    const groupId = -1002386470970; // GroupId cho editdoris
-
     editState.delete(chatId);
-
-    const keyboard = await getMemberKeyboard(chatId, groupId);
-    bot.sendMessage(chatId, '👥 Chọn thành viên cần chỉnh sửa:', {
+    const state = { groupId: GROUPS.doris };
+    editState.set(chatId, state);
+    
+    const keyboard = await getMemberKeyboard(chatId, GROUPS.doris);
+    bot.sendMessage(chatId, '👥 Chọn thành viên DORIS cần chỉnh sửa:', {
         reply_markup: {
             inline_keyboard: keyboard
         }
     });
 });
 
-
-
-// Xử lý các callback query
 bot.on('callback_query', async (query) => {
     const chatId = query.message.chat.id;
     const messageId = query.message.message_id;
     const data = query.data;
+    let state = editState.get(chatId) || {};
 
     if (data === 'edit_cancel') {
         editState.delete(chatId);
@@ -1093,45 +1092,32 @@ bot.on('callback_query', async (query) => {
         return;
     }
 
-    let state = editState.get(chatId) || {};
-
     if (data.startsWith('edit_member:')) {
-    const hash = data.split(':')[1];
-    const groupId = state.groupId; // Lấy groupId từ trạng thái
-    const uniqueMembers = await Trasua.distinct('ten', { groupId });
+        const hash = data.split(':')[1];
+        const uniqueMembers = await Trasua.distinct('ten', { groupId: state.groupId });
+        const member = uniqueMembers.find(m => crypto.createHash('sha256').update(m).digest('hex').substring(0, 20) === hash);
 
-    if (!uniqueMembers || uniqueMembers.length === 0) {
-        bot.sendMessage(chatId, '❌ Danh sách thành viên trống hoặc không tìm thấy.');
-        return;
-    }
-
-    const member = uniqueMembers.find(m => 
-        crypto.createHash('sha256').update(m).digest('hex').substring(0, 20) === hash
-    );
-
-    if (!member) {
-        bot.sendMessage(chatId, '❌ Không tìm thấy thành viên này.');
-        return;
-    }
-
-    state.member = member;
-    editState.set(chatId, state);
-
-    await bot.editMessageText('📅 Chọn ngày cần chỉnh sửa:', {
-        chat_id: chatId,
-        message_id: messageId,
-        reply_markup: {
-            inline_keyboard: getDateKeyboard()
+        if (!member) {
+            bot.sendMessage(chatId, '❌ Không tìm thấy thành viên này.');
+            return;
         }
-    });
-  } 
-    else if (data.startsWith('edit_date:')) {
+
+        state.member = member;
+        editState.set(chatId, state);
+
+        await bot.editMessageText('📅 Chọn ngày cần chỉnh sửa:', {
+            chat_id: chatId,
+            message_id: messageId,
+            reply_markup: {
+                inline_keyboard: getDateKeyboard()
+            }
+        });
+    } else if (data.startsWith('edit_date:')) {
         state.date = data.split(':')[1];
-        const groupId = state.groupId;
         editState.set(chatId, state);
 
         const currentRecord = await Trasua.findOne({
-            groupId,
+            groupId: state.groupId,
             ten: state.member,
             date: state.date
         });
@@ -1151,8 +1137,7 @@ bot.on('callback_query', async (query) => {
                 inline_keyboard: getEditTypeKeyboard()
             }
         });
-    }
-    else if (data.startsWith('edit_type:')) {
+    } else if (data.startsWith('edit_type:')) {
         state.editType = data.split(':')[1];
         editState.set(chatId, state);
 
@@ -1166,7 +1151,7 @@ bot.on('callback_query', async (query) => {
             });
         } else {
             const currentRecord = await Trasua.findOne({
-                groupId: -1002496228650,
+                groupId: state.groupId,
                 ten: state.member,
                 date: state.date
             });
@@ -1188,7 +1173,7 @@ bot.on('callback_query', async (query) => {
         editState.set(chatId, state);
 
         const currentRecord = await Trasua.findOne({
-            groupId: -1002496228650,
+            groupId: state.groupId,
             ten: state.member,
             date: state.date
         });
@@ -1210,8 +1195,6 @@ bot.on('callback_query', async (query) => {
     }
 });
 
-
-// Xử lý nhập ACC và bài đăng
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const state = editState.get(chatId);
@@ -1236,14 +1219,12 @@ bot.on('message', async (msg) => {
             };
         }
 
-        // Fetch current record
         const currentRecord = await Trasua.findOne({
-            groupId: -1002496228650,
+            groupId: state.groupId,
             ten: state.member,
             date: state.date
         });
 
-        // Calculate new total
         const caData = state.waitingForAcc ? 
             { ...currentRecord?.caData || {}, [`Ca${state.shift}`]: newValue } :
             currentRecord?.caData || {};
@@ -1252,10 +1233,9 @@ bot.on('message', async (msg) => {
         const totalPosts = state.waitingForPost ? newValue : (currentRecord?.post || 0);
         const tinh_tien = (totalAcc * 5000) + (totalPosts * 1000);
 
-        // Update database with new values
         const updateResult = await Trasua.findOneAndUpdate(
             {
-                groupId: -1002496228650,
+                groupId: state.groupId,
                 ten: state.member,
                 date: state.date
             },
@@ -1283,10 +1263,8 @@ bot.on('message', async (msg) => {
         console.error(error);
     }
 
-    // Xóa trạng thái chỉnh sửa
     editState.delete(chatId);
 });
-
 
 
 
