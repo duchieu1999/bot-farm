@@ -1053,7 +1053,8 @@ function getShiftKeyboard() {
             { text: 'Ca 4', callback_data: 'edit_shift:4' }
         ],
         [
-            { text: 'Ca 5', callback_data: 'edit_shift:5' }
+            { text: 'Ca 5', callback_data: 'edit_shift:5' },
+            { text: 'Ca 6', callback_data: 'edit_shift:6' }
         ],
         [{ text: '❌ Hủy', callback_data: 'edit_cancel' }]
     ];
