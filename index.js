@@ -872,7 +872,7 @@ async function generateReport(bot, chatId, days, groupId) {
       continue;
     }
 
-    let totalAmount = 50000;
+    let totalAmount = 150000;
 
     let content = bangCongList.map(entry => {
       const { caData = {}, post = 0, acc = 0, tinh_tien, ten } = entry;
@@ -905,7 +905,7 @@ async function generateReport(bot, chatId, days, groupId) {
             </TR>
             ${content.split('\n').map(line => `<TR><TD>${line.split('\t').join('</TD><TD>')}</TD></TR>`).join('')}
             <TR STYLE="background-color: #2196F3; color: white; font-weight: bold;">
-              <TD COLSPAN="8" ALIGN="LEFT">Quản Lý</TD><TD>50,000 vnđ</TD>
+              <TD COLSPAN="8" ALIGN="LEFT">Quản Lý</TD><TD>150,000 vnđ</TD>
             </TR>
             <TR STYLE="background-color: #1976D2; color: white; font-weight: bold;">
               <TD COLSPAN="8" ALIGN="LEFT">Tổng Số Tiền</TD><TD>${totalAmount.toLocaleString()} vnđ</TD>
