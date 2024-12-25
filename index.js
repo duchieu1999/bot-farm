@@ -3106,24 +3106,32 @@ cron.schedule('31 7 * * *', async () => {
 // Xử lý lệnh /homqua để hiển thị bảng công cho tất cả các nhóm
 bot.onText(/\/homqua/, async (msg) => {
   const chatId = msg.chat.id;
-  await sendAggregatedData(chatId);
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  await sendAggregatedData(chatId, yesterday);
 });
 
-async function sendAggregatedData(chatId) {
+// Xử lý lệnh /honnay để hiển thị bảng công cho tất cả các nhóm
+bot.onText(/\/homnay/, async (msg) => {
+  const chatId = msg.chat.id;
+  const today = new Date();
+  await sendAggregatedData(chatId, today);
+});
+
+async function sendAggregatedData(chatId, date) {
   try {
-    // Tính ngày hôm qua
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const startOfYesterday = new Date(yesterday.setHours(0, 0, 0, 0));
-    const endOfYesterday = new Date(yesterday.setHours(23, 59, 59, 999));
-    // Lấy bảng công của ngày hôm qua, loại trừ nhóm có chatId -1002108234982
+    // Xác định đầu và cuối ngày
+    const startOfDay = new Date(date.setHours(0, 0, 0, 0));
+    const endOfDay = new Date(date.setHours(23, 59, 59, 999));
+
+    // Lấy bảng công của ngày, loại trừ nhóm có chatId -1002108234982
     const bangCongs = await BangCong2.find({
-      date: { $gte: startOfYesterday, $lte: endOfYesterday },
-      groupId: { $ne: -1002108234982 }, // Loại trừ nhóm này
+      date: { $gte: startOfDay, $lte: endOfDay },
+      groupId: { $ne: -1002108234982 },
     });
 
     if (bangCongs.length === 0) {
-      bot.sendMessage(chatId, `Không có bảng công nào cho ngày ${yesterday.toLocaleDateString()}.`);
+      bot.sendMessage(chatId, `Không có bảng công nào cho ngày ${startOfDay.toLocaleDateString()}.`);
       return;
     }
 
@@ -3172,7 +3180,7 @@ async function sendAggregatedData(chatId) {
         groupName = `Nhóm ${groupId}`;
       }
 
-      response += `Bảng công nhóm ${groupName} (${yesterday.toLocaleDateString()}):\n\n`;
+      response += `Bảng công nhóm ${groupName} (${startOfDay.toLocaleDateString()}):\n\n`;
 
       let totalGroupMoney = 0;
 
