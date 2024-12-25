@@ -2293,6 +2293,89 @@ async function processAndDistributeOtherTimesheets(chatId) {
 }
 
 
+const managementFees2 = {
+  '-1002198923074': 100000 
+};
+
+const allowedGroupIds2 = [
+  -1002198923074
+];
+
+async function processAndDistributeTimesheets2(chatId, isToday) {
+  const targetDate = isToday ? new Date() : new Date(Date.now() - 86400000); // Today or Yesterday
+  const startOfDay = new Date(targetDate);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(targetDate);
+  endOfDay.setHours(23, 59, 59, 999);
+  const dateStr = `${targetDate.getDate()}/${targetDate.getMonth() + 1}/${targetDate.getFullYear()}`;
+
+  try {
+    let totalAmountByUser = {}; // Đối tượng để lưu tổng số tiền của mỗi người dùng
+
+    for (const groupId of allowedGroupIds2) {
+      const bangCongs = await BangCong2.find({
+        date: { $gte: startOfDay, $lte: endOfDay },
+        groupId: groupId
+      });
+
+      if (bangCongs.length === 0) {
+        continue;
+      }
+
+      let totalAmount = 0;
+      let content = bangCongs.map(bangCong => {
+        totalAmount += bangCong.tinh_tien;
+        totalAmountByUser[bangCong.ten] = (totalAmountByUser[bangCong.ten] || 0) + bangCong.tinh_tien;
+        return `${bangCong.ten}\t${bangCong.quay}\t${bangCong.keo}\t${bangCong.bill || 0}\t${bangCong.anh || 0}\t${bangCong.tinh_tien}vnđ`;
+      }).join('\n');
+
+      // Add management fee for the groupId
+      const managementFee = managementFees2[groupId] || 0;
+      totalAmount += managementFee;
+
+      // Append management fee to the content
+      content += `\nQuản lý\t-\t-\t-\t-\t${managementFee}vnđ`;
+
+      const groupName = await fetchGroupTitle(groupId);
+      const imageUrl = await generateTimesheetImage(content, groupName, totalAmount, dateStr);
+      await bot.sendPhoto(chatId, imageUrl);
+    }
+
+    let totalAmountContent = '';
+    for (const [userName, totalAmount] of Object.entries(totalAmountByUser)) {
+      totalAmountContent += `<TR><TD ALIGN="LEFT" STYLE="font-weight: bold;">${userName}</TD><TD ALIGN="CENTER">${totalAmount}vnđ</TD></TR>`;
+    }
+    const totalAmountImageUrl = await generateSummaryImage(totalAmountContent, dateStr);
+    await bot.sendPhoto(chatId, totalAmountImageUrl);
+
+    if (!isToday) {
+      const messages = [
+        `Attention, attention! Bảng công (${dateStr}) nóng hổi vừa ra lò, ai chưa check điểm danh là lỡ mất cơ hội \"ăn điểm\" với sếp đó nha!`,
+        `Bảng công (${dateStr}) - Phiên bản \"limited edition\", hãy nhanh tay \"sưu tầm\" trước khi hết hàng! ‍♀️‍♂️`,
+      ];
+      const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+      const message = await bot.sendMessage(chatId, randomMessage);
+      await bot.pinChatMessage(chatId, message.message_id);
+    }
+  } catch (error) {
+    console.error('Lỗi khi truy vấn dữ liệu từ MongoDB:', error);
+    bot.sendMessage(chatId, 'Failed to create image.');
+  }
+}
+
+// Lệnh để xử lý bảng công hôm nay
+bot.onText(/\/hieuhomnay/, async (msg) => {
+  const chatId = msg.chat.id;
+  await processAndDistributeTimesheets2(chatId, true);
+});
+
+// Lệnh để xử lý bảng công hôm qua
+bot.onText(/\/hieuhomqua/, async (msg) => {
+  const chatId = msg.chat.id;
+  await processAndDistributeTimesheets2(chatId, false);
+});
+
+
 
 
 
