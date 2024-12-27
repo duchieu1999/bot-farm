@@ -1783,6 +1783,23 @@ async function processSubmission(msg, targetMsg) {
   const userId = targetMsg.from.id;
   const groupId = targetMsg.chat.id;
 
+  // Kiểm tra nếu là reply "thêm"
+  if (msg.reply_to_message && addRegex.test(msg.text)) {
+    const messageId = msg.reply_to_message.message_id;
+    
+    // Kiểm tra xem message_id đã tồn tại chưa
+    const existingRecord = await BangCong2.findOne({
+      messageIds: messageId
+    });
+
+    if (existingRecord) {
+      bot.sendMessage(groupId, "Bài nộp này đã được thêm trước đó!", {
+        reply_to_message_id: msg.message_id
+      });
+      return;
+    }
+  }
+  
   let quay = 0;
   let keo = 0;
   let bill = 0;
