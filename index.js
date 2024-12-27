@@ -33,7 +33,8 @@ const BangCongSchema = new mongoose.Schema({
   da_tru: { type: Boolean, default: false },
   giftWon: { type: Boolean, default: false },
   prizeAmount: { type: Number, default: 0 },
-  processedMessageIds: { type: [Number], default: [] }, // Thêm trường mới
+  processedMessageIds: { type: [Number], default: [] }, // Thêm trường mới của trừ
+  MessageIds: { type: [Number], default: [] }, // Mảng các messageId của thêm
   nhan_anh_bill: { type: Number, default: 0 } // Ensure default is 0
 });
 
@@ -1745,9 +1746,20 @@ bot.on('message', async (msg) => {
           await processSubmission(msg, msg);
         }
       } else if (msg.reply_to_message && addRegex.test(messageContent)) {
-        const repliedMessage = msg.reply_to_message;
-        const repliedMessageContent = repliedMessage.text || repliedMessage.caption;
+  const repliedMessage = msg.reply_to_message;
+  
+  // Kiểm tra message đã tồn tại trong bất kỳ bản ghi nào
+  const existingSubmission = await BangCong2.findOne({ 
+    groupId: msg.chat.id,
+    MessageIds: repliedMessage.message_id
+  });
 
+  if (existingSubmission) {
+    bot.sendMessage(msg.chat.id, "Không thể thêm bài nộp này vì đã được thêm trước đó.", {
+      reply_to_message_id: msg.message_id
+    });
+    return;
+  }
         const replyMatches = repliedMessageContent.match(regex);
         if (replyMatches) {
           const cleanRepliedMessage = normalizeContent(replyMatches.join(''));
@@ -1781,6 +1793,20 @@ async function processSubmission(msg, targetMsg) {
   const matches = messageContent.match(regex);
   const userId = targetMsg.from.id;
   const groupId = targetMsg.chat.id;
+  const messageId = targetMsg.message_id;
+
+  // Kiểm tra message đã tồn tại
+  const existingSubmission = await BangCong2.findOne({ 
+    groupId,
+    MessageIds: messageId
+  });
+
+  if (existingSubmission) {
+    bot.sendMessage(groupId, "Không thể thêm bài nộp này vì đã được thêm trước đó.", {
+      reply_to_message_id: msg.message_id
+    });
+    return;
+  }
 
   let quay = 0;
   let keo = 0;
@@ -1816,7 +1842,7 @@ async function processSubmission(msg, targetMsg) {
   const firstName = targetMsg.from.first_name;
   const lastName = targetMsg.from.last_name;
   const fullName = lastName ? `${firstName} ${lastName}` : firstName;
-
+  
   // Xác định giá dựa trên groupId
   let pricePerQuay = 500;
   let pricePerKeo = 1000;
@@ -1871,6 +1897,7 @@ async function processSubmission(msg, targetMsg) {
         userId,
         groupId,
         date: targetDate,
+        MessageIds: [messageId],
         submissionTime,
         ten: fullName,
         quay,
@@ -1882,6 +1909,7 @@ async function processSubmission(msg, targetMsg) {
         da_tru: false // Đánh dấu bài nộp ban đầu là chưa bị trừ
       });
     } else {
+      bangCong.MessageIds.push(messageId); // Thêm messageId mới vào mảng
       bangCong.quay += quay;
       bangCong.keo += keo;
       bangCong.bill += bill;
