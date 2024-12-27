@@ -1782,20 +1782,6 @@ async function processSubmission(msg, targetMsg) {
   const matches = messageContent.match(regex);
   const userId = targetMsg.from.id;
   const groupId = targetMsg.chat.id;
-  const messageId = targetMsg.message_id;
-
-  // Kiểm tra xem message_id đã tồn tại trong bất kỳ bản ghi nào chưa
-  const existingRecord = await BangCong2.findOne({
-    messageIds: messageId
-  });
-
-  if (existingRecord) {
-    // Nếu message_id đã tồn tại, từ chối thêm mới
-    bot.sendMessage(msg.chat.id, "Bài nộp này đã được ghi nhận trước đó!", {
-      reply_to_message_id: msg.message_id
-    });
-    return;
-  }
 
   let quay = 0;
   let keo = 0;
@@ -1894,21 +1880,15 @@ async function processSubmission(msg, targetMsg) {
         anh,
         video,
         tinh_tien: totalMoney,
-        da_tru: false, // Đánh dấu bài nộp ban đầu là chưa bị trừ
-        messageIds: msg.reply_to_message && addRegex.test(msg.text) ? [msg.reply_to_message.message_id] : [] // Chỉ thêm message_id khi là reply "thêm"
-    });
-  } else {
-    bangCong.quay += quay;
-    bangCong.keo += keo;
-    bangCong.bill += bill;
-    bangCong.anh += anh;
-    bangCong.video += video;
-    bangCong.tinh_tien += totalMoney;
-
-    // Chỉ thêm message_id vào mảng khi là reply "thêm"
-    if (msg.reply_to_message && addRegex.test(msg.text)) {
-      bangCong.messageIds.push(msg.reply_to_message.message_id);
-    }
+        da_tru: false // Đánh dấu bài nộp ban đầu là chưa bị trừ
+      });
+    } else {
+      bangCong.quay += quay;
+      bangCong.keo += keo;
+      bangCong.bill += bill;
+      bangCong.anh += anh;
+      bangCong.video += video;
+      bangCong.tinh_tien += totalMoney;
 
       const member = await Member.findOne({ userId });
       // Tính toán hệ số giảm exp dựa trên levelPercent
@@ -1938,7 +1918,6 @@ async function processSubmission(msg, targetMsg) {
     await updateMissionProgress(userId);
   });
 }
-
 
       
 
