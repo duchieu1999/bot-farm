@@ -34,7 +34,7 @@ const BangCongSchema = new mongoose.Schema({
   giftWon: { type: Boolean, default: false },
   prizeAmount: { type: Number, default: 0 },
   processedMessageIds: { type: [Number], default: [] }, // Thêm trường mới của trừ
-  MessageIds: { type: [Number], default: [] }, // Mảng các messageId của thêm
+  messageIds: [Number],
   nhan_anh_bill: { type: Number, default: 0 } // Ensure default is 0
 });
 
@@ -1746,20 +1746,9 @@ bot.on('message', async (msg) => {
           await processSubmission(msg, msg);
         }
       } else if (msg.reply_to_message && addRegex.test(messageContent)) {
-  const repliedMessage = msg.reply_to_message;
-  
-  // Kiểm tra message đã tồn tại trong bất kỳ bản ghi nào
-  const existingSubmission = await BangCong2.findOne({ 
-    groupId: msg.chat.id,
-    MessageIds: repliedMessage.message_id
-  });
+        const repliedMessage = msg.reply_to_message;
+        const repliedMessageContent = repliedMessage.text || repliedMessage.caption;
 
-  if (existingSubmission) {
-    bot.sendMessage(msg.chat.id, "Không thể thêm bài nộp này vì đã được thêm trước đó.", {
-      reply_to_message_id: msg.message_id
-    });
-    return;
-  }
         const replyMatches = repliedMessageContent.match(regex);
         if (replyMatches) {
           const cleanRepliedMessage = normalizeContent(replyMatches.join(''));
@@ -1795,14 +1784,14 @@ async function processSubmission(msg, targetMsg) {
   const groupId = targetMsg.chat.id;
   const messageId = targetMsg.message_id;
 
-  // Kiểm tra message đã tồn tại
-  const existingSubmission = await BangCong2.findOne({ 
-    groupId,
-    MessageIds: messageId
+  // Kiểm tra xem message_id đã tồn tại trong bất kỳ bản ghi nào chưa
+  const existingRecord = await BangCong2.findOne({
+    messageIds: messageId
   });
 
-  if (existingSubmission) {
-    bot.sendMessage(groupId, "Không thể thêm bài nộp này vì đã được thêm trước đó.", {
+  if (existingRecord) {
+    // Nếu message_id đã tồn tại, từ chối thêm mới
+    bot.sendMessage(msg.chat.id, "Bài nộp này đã được ghi nhận trước đó!", {
       reply_to_message_id: msg.message_id
     });
     return;
@@ -1841,8 +1830,8 @@ async function processSubmission(msg, targetMsg) {
   const submissionTime = new Date(targetMsg.date * 1000).toLocaleTimeString();
   const firstName = targetMsg.from.first_name;
   const lastName = targetMsg.from.last_name;
-  const fullName = lastName ? `${firstName} ${lastName}` : firstName;
-  
+  const fullName = lastName ? ${firstName} ${lastName} : firstName;
+
   // Xác định giá dựa trên groupId
   let pricePerQuay = 500;
   let pricePerKeo = 1000;
@@ -1887,7 +1876,7 @@ async function processSubmission(msg, targetMsg) {
   const totalMoney = (quay * pricePerQuay) + (keo * pricePerKeo) + (bill * pricePerBill) + (anh * pricePerAnh) + (video * pricePerVideo);
 
   const randomEmoji = getRandomEmoji();
-  const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${quay} quẩy, ${keo} cộng, ${bill} bill, ${anh} ảnh vào ngày ${targetDate} lúc ${submissionTime} đang chờ kiểm tra ${randomEmoji}🥳. Tổng tiền: +${totalMoney.toLocaleString()} VNĐ`;
+  const responseMessage = Bài nộp của ${fullName} đã được ghi nhận với ${quay} quẩy, ${keo} cộng, ${bill} bill, ${anh} ảnh vào ngày ${targetDate} lúc ${submissionTime} đang chờ kiểm tra ${randomEmoji}🥳. Tổng tiền: +${totalMoney.toLocaleString()} VNĐ;
 
   bot.sendMessage(groupId, responseMessage, { reply_to_message_id: msg.message_id }).then(async () => {
     let bangCong = await BangCong2.findOne({ userId, groupId, date: targetDate, submissionTime });
@@ -1897,7 +1886,6 @@ async function processSubmission(msg, targetMsg) {
         userId,
         groupId,
         date: targetDate,
-        MessageIds: [messageId],
         submissionTime,
         ten: fullName,
         quay,
@@ -1906,16 +1894,17 @@ async function processSubmission(msg, targetMsg) {
         anh,
         video,
         tinh_tien: totalMoney,
-        da_tru: false // Đánh dấu bài nộp ban đầu là chưa bị trừ
+        da_tru: false, // Đánh dấu bài nộp ban đầu là chưa bị trừ
+        messageIds: [messageId] // Thêm message_id vào mảng
       });
     } else {
-      bangCong.MessageIds.push(messageId); // Thêm messageId mới vào mảng
       bangCong.quay += quay;
       bangCong.keo += keo;
       bangCong.bill += bill;
       bangCong.anh += anh;
       bangCong.video += video;
       bangCong.tinh_tien += totalMoney;
+      bangCong.messageIds.push(messageId); // Thêm message_id mới vào mảng
 
       const member = await Member.findOne({ userId });
       // Tính toán hệ số giảm exp dựa trên levelPercent
@@ -1945,9 +1934,6 @@ async function processSubmission(msg, targetMsg) {
     await updateMissionProgress(userId);
   });
 }
-
-
-
 
 
       
