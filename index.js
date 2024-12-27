@@ -1816,7 +1816,7 @@ async function processSubmission(msg, targetMsg) {
   const submissionTime = new Date(targetMsg.date * 1000).toLocaleTimeString();
   const firstName = targetMsg.from.first_name;
   const lastName = targetMsg.from.last_name;
-  const fullName = lastName ? ${firstName} ${lastName} : firstName;
+ const fullName = lastName ? `${firstName} ${lastName}` : firstName;
 
   // Xác định giá dựa trên groupId
   let pricePerQuay = 500;
@@ -1880,16 +1880,21 @@ async function processSubmission(msg, targetMsg) {
         anh,
         video,
         tinh_tien: totalMoney,
-        da_tru: false // Đánh dấu bài nộp ban đầu là chưa bị trừ
-      });
-    } else {
-      bangCong.quay += quay;
-      bangCong.keo += keo;
-      bangCong.bill += bill;
-      bangCong.anh += anh;
-      bangCong.video += video;
-      bangCong.tinh_tien += totalMoney;
+        da_tru: false, // Đánh dấu bài nộp ban đầu là chưa bị trừ
+      messageIds: msg.reply_to_message && addRegex.test(msg.text) ? [msg.reply_to_message.message_id] : [] // Chỉ thêm message_id khi là reply "thêm"
+    });
+  } else {
+    bangCong.quay += quay;
+    bangCong.keo += keo;
+    bangCong.bill += bill;
+    bangCong.anh += anh;
+    bangCong.video += video;
+    bangCong.tinh_tien += totalMoney;
 
+    // Chỉ thêm message_id vào mảng khi là reply "thêm"
+    if (msg.reply_to_message && addRegex.test(msg.text)) {
+      bangCong.messageIds.push(msg.reply_to_message.message_id);
+    }
       const member = await Member.findOne({ userId });
       // Tính toán hệ số giảm exp dựa trên levelPercent
       let expMultiplier = 1;
