@@ -1816,7 +1816,7 @@ async function processSubmission(msg, targetMsg) {
   const submissionTime = new Date(targetMsg.date * 1000).toLocaleTimeString();
   const firstName = targetMsg.from.first_name;
   const lastName = targetMsg.from.last_name;
- const fullName = lastName ? `${firstName} ${lastName}` : firstName;
+  const fullName = lastName ? `${firstName} ${lastName}` : firstName;
 
   // Xác định giá dựa trên groupId
   let pricePerQuay = 500;
@@ -1862,7 +1862,7 @@ async function processSubmission(msg, targetMsg) {
   const totalMoney = (quay * pricePerQuay) + (keo * pricePerKeo) + (bill * pricePerBill) + (anh * pricePerAnh) + (video * pricePerVideo);
 
   const randomEmoji = getRandomEmoji();
-  const responseMessage = Bài nộp của ${fullName} đã được ghi nhận với ${quay} quẩy, ${keo} cộng, ${bill} bill, ${anh} ảnh vào ngày ${targetDate} lúc ${submissionTime} đang chờ kiểm tra ${randomEmoji}🥳. Tổng tiền: +${totalMoney.toLocaleString()} VNĐ;
+  const responseMessage = `Bài nộp của ${fullName} đã được ghi nhận với ${quay} quẩy, ${keo} cộng, ${bill} bill, ${anh} ảnh vào ngày ${targetDate} lúc ${submissionTime} đang chờ kiểm tra ${randomEmoji}🥳. Tổng tiền: +${totalMoney.toLocaleString()} VNĐ`;
 
   bot.sendMessage(groupId, responseMessage, { reply_to_message_id: msg.message_id }).then(async () => {
     let bangCong = await BangCong2.findOne({ userId, groupId, date: targetDate, submissionTime });
@@ -1881,7 +1881,7 @@ async function processSubmission(msg, targetMsg) {
         video,
         tinh_tien: totalMoney,
         da_tru: false, // Đánh dấu bài nộp ban đầu là chưa bị trừ
-      messageIds: msg.reply_to_message && addRegex.test(msg.text) ? [msg.reply_to_message.message_id] : [] // Chỉ thêm message_id khi là reply "thêm"
+        messageIds: msg.reply_to_message && addRegex.test(msg.text) ? [msg.reply_to_message.message_id] : [] // Chỉ thêm message_id khi là reply "thêm"
     });
   } else {
     bangCong.quay += quay;
@@ -1895,6 +1895,7 @@ async function processSubmission(msg, targetMsg) {
     if (msg.reply_to_message && addRegex.test(msg.text)) {
       bangCong.messageIds.push(msg.reply_to_message.message_id);
     }
+
       const member = await Member.findOne({ userId });
       // Tính toán hệ số giảm exp dựa trên levelPercent
       let expMultiplier = 1;
@@ -1923,7 +1924,6 @@ async function processSubmission(msg, targetMsg) {
     await updateMissionProgress(userId);
   });
 }
-
       
 
 const allowedGroupIds = [
