@@ -140,9 +140,9 @@ const DailyTask = mongoose.model('DailyTask', DailyTaskSchema);
 
 const token = '7150645082:AAH-N2VM6qx3iFEhK59YHx2e1oy3Bi1EzXc';
 const url = 'https://bot-farm-twjg.onrender.com'; // URL của webhook
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+// Lắng nghe cổng (có thể thay đổi theo môi trường)
+app.listen(process.env.PORT || 3000, () => {
+  console.log('Server is running on port 3000');
 });
 
 
