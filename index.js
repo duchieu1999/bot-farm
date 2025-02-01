@@ -292,13 +292,6 @@ app.delete('/member/:userId', async (req, res) => {
   }
 });
 
-// Lắng nghe cổng (có thể thay đổi theo môi trường)
-app.listen(process.env.PORT || 3000, () => {
-  console.log('Server is running on port 3000');
-});
-
-
-
 // Hàm để tự động load các file từ thư mục
 function loadFiles() {
     // Load từ thư mục commands
