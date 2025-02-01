@@ -140,7 +140,7 @@ const DailyTask = mongoose.model('DailyTask', DailyTaskSchema);
 
 const token = '7150645082:AAH-N2VM6qx3iFEhK59YHx2e1oy3Bi1EzXc';
 const url = 'https://bot-farm-twjg.onrender.com'; // URL của webhook
-
+const port = process.env.PORT || 3000;
 
 
 // Khởi tạo bot với chế độ webhook
@@ -4973,7 +4973,6 @@ bot.on('message', async (msg) => {
   }
 });
 
-const port = process.env.PORT || 3000;
 
 // Lắng nghe cổng đã khai báo
 app.listen(port, () => {
