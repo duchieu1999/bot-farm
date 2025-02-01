@@ -139,14 +139,12 @@ const Message = mongoose.model('Message', MessageSchema);
 const DailyTask = mongoose.model('DailyTask', DailyTaskSchema);
 
 const token = '7150645082:AAH-N2VM6qx3iFEhK59YHx2e1oy3Bi1EzXc';
-const url = 'https://bot-farm-twjg.onrender.com'; // URL của webhook
 const port = process.env.PORT || 3000;
 
 
-// Khởi tạo bot với chế độ webhook
-const bot = new TelegramBot(token, { webHook: { port: port } });
-// Thiết lập webhook của bạn
-bot.setWebHook(`${url}/bot${token}`);
+const bot = new TelegramBot(token, { polling: true }); // ✅ Sử dụng polling
+
+console.log("🤖 Bot đang chạy với chế độ polling...");
 
 // Khởi tạo express server
 const app = express();
