@@ -12,6 +12,9 @@ const cron = require('node-cron'); // Thư viện để thiết lập cron jobs
 const keep_alive = require('./keep_alive.js');
 const { setupNewsSchedule, sendLatestNews } = require('./news.js');
 
+const cors = require('cors');
+const bcrypt = require('bcrypt');
+
 // Kết nối tới MongoDB
 mongoose.connect(
   'mongodb+srv://duchieufaryoung0:80E9gUahdOXmGKuy@cluster0.6nlv1cv.mongodb.net/telegram_bot_db?retryWrites=true&w=majority',
@@ -147,6 +150,7 @@ bot.setWebHook(`${url}/bot${token}`);
 
 // Khởi tạo express server
 const app = express();
+app.use(cors());
 app.use(bodyParser.json());
 
 // Định nghĩa route cho webhook
@@ -154,6 +158,145 @@ app.post(`/bot${token}`, (req, res) => {
   bot.processUpdate(req.body);
   res.sendStatus(200);
 });
+
+// API Login
+app.post('/login', async (req, res) => {
+  const { userId, password } = req.body;
+
+  // Kiểm tra xem userId và password có hợp lệ không
+  if (!userId || !password) {
+    return res.status(400).json({ message: 'Vui lòng nhập userId và mật khẩu!' });
+  }
+
+  // Kiểm tra mật khẩu mặc định (123456)
+  if (password !== '123456') {
+    return res.status(401).json({ message: 'Mật khẩu không chính xác!' });
+  }
+
+  // Tìm kiếm Member trong MongoDB
+  try {
+    const member = await Member.findOne({ userId });
+
+    if (!member) {
+      return res.status(404).json({ message: 'Không tìm thấy tài khoản với userId này!' });
+    }
+
+    // Trả về thông tin tài khoản người dùng
+    res.status(200).json({
+      message: 'Đăng nhập thành công!',
+      data: {
+        userId: member.userId,
+        fullname: member.fullname,
+        level: member.level,
+        exp: member.exp,
+        assets: member.assets
+      }
+    });
+  } catch (error) {
+    console.error('Lỗi khi truy vấn MongoDB: ', error);
+    res.status(500).json({ message: 'Lỗi server, vui lòng thử lại sau!' });
+  }
+});
+
+// API để lấy thông tin của người dùng
+app.get('/member/:userId', async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const member = await Member.findOne({ userId });
+
+    if (!member) {
+      return res.status(404).json({ message: 'Không tìm thấy tài khoản với userId này!' });
+    }
+
+    res.status(200).json({
+      data: {
+        userId: member.userId,
+        fullname: member.fullname,
+        level: member.level,
+        previousQuay: member.previousQuay,
+        previousKeo: member.previousKeo,
+        assets: member.assets
+      }
+    });
+  } catch (error) {
+    console.error('Lỗi khi truy vấn MongoDB: ', error);
+    res.status(500).json({ message: 'Lỗi server, vui lòng thử lại sau!' });
+  }
+});
+
+// API để tạo mới một Member
+app.post('/member', async (req, res) => {
+  const { userId, fullname, level = 1, assets = { quay: 0, keo: 0, vnd: 0 } } = req.body;
+
+  try {
+    // Kiểm tra nếu đã có userId trong DB
+    const existingMember = await Member.findOne({ userId });
+    if (existingMember) {
+      return res.status(400).json({ message: 'userId này đã tồn tại!' });
+    }
+
+    const newMember = new Member({
+      userId,
+      fullname,
+      level,
+      assets
+    });
+
+    await newMember.save();
+    res.status(201).json({ message: 'Tạo tài khoản thành công!', data: newMember });
+  } catch (error) {
+    console.error('Lỗi khi tạo tài khoản: ', error);
+    res.status(500).json({ message: 'Lỗi server, vui lòng thử lại sau!' });
+  }
+});
+
+// API để cập nhật thông tin Member
+app.put('/member/:userId', async (req, res) => {
+  const { userId } = req.params;
+  const { fullname, level, assets } = req.body;
+
+  try {
+    const member = await Member.findOneAndUpdate(
+      { userId },
+      { fullname, level, assets },
+      { new: true }
+    );
+
+    if (!member) {
+      return res.status(404).json({ message: 'Không tìm thấy tài khoản với userId này!' });
+    }
+
+    res.status(200).json({ message: 'Cập nhật thành công!', data: member });
+  } catch (error) {
+    console.error('Lỗi khi cập nhật thông tin: ', error);
+    res.status(500).json({ message: 'Lỗi server, vui lòng thử lại sau!' });
+  }
+});
+
+// API để xóa Member
+app.delete('/member/:userId', async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const member = await Member.findOneAndDelete({ userId });
+
+    if (!member) {
+      return res.status(404).json({ message: 'Không tìm thấy tài khoản với userId này!' });
+    }
+
+    res.status(200).json({ message: 'Xóa tài khoản thành công!', data: member });
+  } catch (error) {
+    console.error('Lỗi khi xóa tài khoản: ', error);
+    res.status(500).json({ message: 'Lỗi server, vui lòng thử lại sau!' });
+  }
+});
+
+// Lắng nghe cổng (có thể thay đổi theo môi trường)
+app.listen(process.env.PORT || 3000, () => {
+  console.log('Server is running on port 3000');
+});
+
 
 
 // Hàm để tự động load các file từ thư mục
