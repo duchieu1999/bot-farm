@@ -4006,22 +4006,6 @@ bot.on('message', async (msg) => {
   const userId = msg.from.id;
   const messageContent = msg.text || msg.caption;
 
-  // Kiểm tra nhóm không được phép
-  if (chatId < 0 && !kickbot.hasOwnProperty(chatId.toString())) {
-    console.log(`Unauthorized group detected: ${chatId}`);
-    try {
-      await bot.sendMessage(chatId, "Cha mẹ đứa nào add tao vào nhóm đấy xin phép anh Hieu Gà chưa @Hieu_ga");
-    } catch (error) {
-      console.error(`Failed to send warning message to ${chatId}:`, error);
-    }
-    try {
-      await bot.leaveChat(chatId);
-    } catch (error) {
-      console.error(`Failed to leave chat ${chatId}:`, error);
-    }
-    return;
-  }
-
   if (msg.text && (msg.text.startsWith('/') || msg.text.startsWith('chưa có'))) return;
 
   // Tìm hoặc tạo mới thành viên
