@@ -3960,8 +3960,6 @@ bot.onText(/\/start/, async (msg) => {
   }
 });       
 
-const fs = require('fs');
-const path = require('path');
 
 // Đường dẫn đến file lưu trữ dữ liệu
 const DATA_FILE_PATH = path.join(__dirname, 'kickbot_data.json');
