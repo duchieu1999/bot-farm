@@ -1704,6 +1704,149 @@ bot.onText(/\/123456/, async (msg) => {
 });
 
 
+
+
+
+
+
+// Schema cho Group và Price
+const groupSchema = new mongoose.Schema({
+  groupId: { type: Number, unique: true },
+  pricePerQuay: Number,
+  pricePerKeo: Number,
+  pricePerBill: Number,
+  pricePerAnh: Number,
+  pricePerVideo: Number,
+});
+
+const Group = mongoose.model('Group', groupSchema);
+
+// Hàm để hiển thị menu quản lý group
+function showGroupManagementMenu(chatId, messageId = null) {
+  const options = {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: 'Thêm Group', callback_data: 'add_group' }],
+        [{ text: 'Chỉnh sửa Group', callback_data: 'edit_group' }],
+      ],
+    },
+  };
+
+  if (messageId) {
+    bot.editMessageText('Quản lý Group:', { chat_id: chatId, message_id: messageId, ...options });
+  } else {
+    bot.sendMessage(chatId, 'Quản lý Group:', options);
+  }
+}
+
+// Hàm để hiển thị danh sách các group
+async function showGroupList(chatId, messageId = null) {
+  const groups = await Group.find({});
+  const keyboard = groups.map(group => [{ text: `Group ${group.groupId}`, callback_data: `group_${group.groupId}` }]);
+
+  const options = {
+    reply_markup: {
+      inline_keyboard: keyboard,
+    },
+  };
+
+  if (messageId) {
+    bot.editMessageText('Chọn Group để chỉnh sửa:', { chat_id: chatId, message_id: messageId, ...options });
+  } else {
+    bot.sendMessage(chatId, 'Chọn Group để chỉnh sửa:', options);
+  }
+}
+
+// Hàm để hiển thị menu chỉnh sửa giá của một group
+async function showEditGroupMenu(chatId, groupId, messageId = null) {
+  const group = await Group.findOne({ groupId });
+  if (!group) {
+    bot.sendMessage(chatId, 'Group không tồn tại.');
+    return;
+  }
+
+  const options = {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: `Giá Quẩy: ${group.pricePerQuay}`, callback_data: `edit_quay_${groupId}` }],
+        [{ text: `Giá Kéo: ${group.pricePerKeo}`, callback_data: `edit_keo_${groupId}` }],
+        [{ text: `Giá Bill: ${group.pricePerBill}`, callback_data: `edit_bill_${groupId}` }],
+        [{ text: `Giá Ảnh: ${group.pricePerAnh}`, callback_data: `edit_anh_${groupId}` }],
+        [{ text: `Giá Video: ${group.pricePerVideo}`, callback_data: `edit_video_${groupId}` }],
+        [{ text: 'Quay lại', callback_data: 'back_to_group_list' }],
+      ],
+    },
+  };
+
+  if (messageId) {
+    bot.editMessageText(`Chỉnh sửa giá cho Group ${groupId}:`, { chat_id: chatId, message_id: messageId, ...options });
+  } else {
+    bot.sendMessage(chatId, `Chỉnh sửa giá cho Group ${groupId}:`, options);
+  }
+}
+
+// Hàm để xử lý việc thêm group mới
+async function addGroup(chatId, messageId) {
+  bot.sendMessage(chatId, 'Vui lòng nhập Group ID:');
+  bot.once('message', async (msg) => {
+    const groupId = Number(msg.text);
+
+    // Kiểm tra xem group đã tồn tại chưa
+    const existingGroup = await Group.findOne({ groupId });
+    if (existingGroup) {
+      bot.sendMessage(chatId, `Group ${groupId} đã tồn tại.`);
+      showGroupManagementMenu(chatId, messageId);
+      return;
+    }
+
+    // Tạo group mới với giá mặc định
+    const newGroup = new Group({
+      groupId,
+      pricePerQuay: 500,
+      pricePerKeo: 1000,
+      pricePerBill: 3000,
+      pricePerAnh: 3000,
+      pricePerVideo: 10000,
+    });
+
+    await newGroup.save();
+    bot.sendMessage(chatId, `Group ${groupId} đã được thêm thành công.`);
+    showGroupManagementMenu(chatId, messageId);
+  });
+}
+
+// Xử lý callback từ inline keyboard
+bot.on('callback_query', async (callbackQuery) => {
+  const chatId = callbackQuery.message.chat.id;
+  const messageId = callbackQuery.message.message_id;
+  const data = callbackQuery.data;
+
+  if (data === 'add_group') {
+    addGroup(chatId, messageId);
+  } else if (data === 'edit_group') {
+    showGroupList(chatId, messageId);
+  } else if (data.startsWith('group_')) {
+    const groupId = Number(data.split('_')[1]);
+    showEditGroupMenu(chatId, groupId, messageId);
+  } else if (data.startsWith('edit_')) {
+    const [action, groupId] = data.split('_');
+    bot.sendMessage(chatId, `Vui lòng nhập giá mới cho ${action.replace('edit_', '')}:`);
+    bot.once('message', async (msg) => {
+      const newPrice = Number(msg.text);
+      const updateField = `pricePer${action.replace('edit_', '').charAt(0).toUpperCase() + action.replace('edit_', '').slice(1)}`;
+      await Group.updateOne({ groupId }, { [updateField]: newPrice });
+      bot.sendMessage(chatId, `Giá ${action.replace('edit_', '')} đã được cập nhật thành ${newPrice}.`);
+      showEditGroupMenu(chatId, groupId, messageId);
+    });
+  } else if (data === 'back_to_group_list') {
+    showGroupList(chatId, messageId);
+  }
+});
+
+// Lệnh để mở menu quản lý group
+bot.onText(/\/quanlycongnhat/, (msg) => {
+  showGroupManagementMenu(msg.chat.id);
+});
     
 const addRegex = /thêm/i;
 const bayNhomRegex = /bay\s*nhóm/i;
@@ -3817,6 +3960,29 @@ bot.onText(/\/start/, async (msg) => {
   }
 });       
 
+const fs = require('fs');
+const path = require('path');
+
+// Đường dẫn đến file lưu trữ dữ liệu
+const DATA_FILE_PATH = path.join(__dirname, 'kickbot_data.json');
+
+// Hàm đọc dữ liệu từ file
+function loadData() {
+  if (fs.existsSync(DATA_FILE_PATH)) {
+    const data = fs.readFileSync(DATA_FILE_PATH, 'utf8');
+    return JSON.parse(data);
+  }
+  return {}; // Trả về object rỗng nếu file không tồn tại
+}
+
+// Hàm lưu dữ liệu vào file
+function saveData(data) {
+  fs.writeFileSync(DATA_FILE_PATH, JSON.stringify(data, null, 2), 'utf8');
+}
+
+// Khởi tạo dữ liệu từ file
+let kickbot = loadData();
+
 // Hàm kiểm tra và rời khỏi các nhóm không được phép
 async function leaveUnauthorizedGroups() {
   try {
@@ -3846,6 +4012,29 @@ async function leaveUnauthorizedGroups() {
     console.error('Failed to fetch updates:', error);
   }
 }
+
+// Hàm để thêm groupid mới
+function addGroupId(chatId, groupId) {
+  kickbot[groupId] = "Nhóm mới"; // Mặc định tên nhóm là "Nhóm mới"
+  saveData(kickbot); // Lưu dữ liệu vào file
+  console.log(`Added new group: ${groupId}`);
+  bot.sendMessage(chatId, `Đã thêm nhóm mới với ID: ${groupId}`);
+}
+
+// Xử lý lệnh "Thêm nhóm"
+bot.onText(/Thêm nhóm/, (msg) => {
+  const chatId = msg.chat.id;
+  bot.sendMessage(chatId, "Vui lòng nhập groupid của nhóm bạn muốn thêm.");
+  bot.once('message', (msg) => {
+    const groupId = msg.text.trim(); // Lấy groupid từ tin nhắn của người dùng
+    if (groupId) {
+      addGroupId(chatId, groupId);
+    } else {
+      bot.sendMessage(chatId, "Groupid không hợp lệ. Vui lòng thử lại.");
+    }
+  });
+});
+
 // Gọi hàm rời khỏi các nhóm không được phép khi khởi động bot
 leaveUnauthorizedGroups();
 
