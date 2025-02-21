@@ -2543,7 +2543,11 @@ async function processAndDistributeOtherTimesheets(chatId) {
     });
 
     // Filter out the allowedGroupIds
-    const otherGroupIds = allGroupIds.filter(id => !allowedGroupIds.includes(id));
+    const excludedGroupIds = [...allowedGroupIds, ...allowedGroupIdsnary];
+
+// Lọc ra các nhóm không thuộc danh sách loại trừ
+const otherGroupIds = allGroupIds.filter(id => !excludedGroupIds.includes(id));
+
 
     for (const groupId of otherGroupIds) {
       const bangCongs = await BangCong2.find({
@@ -2587,6 +2591,8 @@ const managementFees2 = {
   '-1002198923074': 100000 
 };
 
+const allowedGroupIdsnary = [
+  -1002382659317 ];
 const allowedGroupIds2 = [
   -1002198923074
 ];
@@ -2705,8 +2711,8 @@ async function processTotalTimesheet(chatId, numDays) {
             date: { $gte: startDate, $lte: endDate },
         });
 
-        // Loại bỏ groupId thuộc allowedGroupIds
-        const filteredGroupIds = allGroupIds.filter(groupId => !allowedGroupIds.includes(groupId));
+        // Lọc ra các nhóm không thuộc danh sách loại trừ
+const filteredGroupIds = allGroupIds.filter(groupId => !excludedGroupIds.includes(groupId));
 
         for (const groupId of filteredGroupIds) {
             const bangCongs = await BangCong2.find({
