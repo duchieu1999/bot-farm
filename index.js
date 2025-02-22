@@ -2013,7 +2013,8 @@ async function processSubmission(msg, targetMsg) {
       break;
     case -1002129896837:
     case -1002457468797:
-    case -1002382659317:    
+    case -1002382659317: 
+    case -1002208226506:
       pricePerKeo = 1000;
       pricePerQuay = 350;
       break;
