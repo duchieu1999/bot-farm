@@ -5051,8 +5051,7 @@ const spamKeywords = [
 ];
 
 // Danh sách groupId được phép kiểm tra
-const allowedGroupIdss = [-1002208226506, -1002333438294];
-
+const allowedGroupIdss = [-1002122969493, -1002094623131];
 
 // Map để lưu thời gian tin nhắn cuối cùng của mỗi user
 const userLastMessageTime = new Map();
@@ -5075,24 +5074,20 @@ async function checkSpamMessage(msg, messageContent) {
     return true;
   }
 
+  // Kiểm tra từ khóa spam
+  const containsSpam = spamKeywords.some(keyword => {
+    const regex = new RegExp(`\\b${keyword}\\b`, 'i');
+    return regex.test(lowerCaseMessage);
+  });
+
   // Kiểm tra thời gian giữa các tin nhắn của cùng một user
   const currentTime = new Date().getTime();
   const lastMessageTime = userLastMessageTime.get(userId) || 0;
   
-  // Cập nhật thời gian tin nhắn mới nhất của user
-  userLastMessageTime.set(userId, currentTime);
-
   // Nếu thời gian giữa 2 tin nhắn của cùng user < 1 phút
   if (currentTime - lastMessageTime < 60000) { // 60000ms = 1 phút
     return true;
   }
-
-  // Kiểm tra từ khóa spam
-  const containsSpam = spamKeywords.some(keyword => {
-    // Sử dụng regex để tránh xóa nhầm
-    const regex = new RegExp(`\\b${keyword}\\b`, 'i');
-    return regex.test(lowerCaseMessage);
-  });
 
   return containsSpam;
 }
@@ -5101,6 +5096,7 @@ async function checkSpamMessage(msg, messageContent) {
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const messageContent = msg.text || msg.caption;
+  const userId = msg.from.id;
 
   // Kiểm tra nhóm được phép
   if (!allowedGroupIdss.includes(chatId)) {
@@ -5113,6 +5109,10 @@ bot.on('message', async (msg) => {
     if (isSpam) {
       // Chỉ xóa tin nhắn spam
       await bot.deleteMessage(chatId, msg.message_id);
+    } else {
+      // Chỉ cập nhật thời gian khi tin nhắn không phải spam
+      const currentTime = new Date().getTime();
+      userLastMessageTime.set(userId, currentTime);
     }
   } catch (error) {
     console.error("Lỗi khi xử lý tin nhắn:", error);
@@ -5123,6 +5123,7 @@ bot.on('message', async (msg) => {
 bot.on('edited_message', async (msg) => {
   const chatId = msg.chat.id;
   const messageContent = msg.text || msg.caption;
+  const userId = msg.from.id;
 
   if (!allowedGroupIdss.includes(chatId)) {
     return;
@@ -5133,6 +5134,10 @@ bot.on('edited_message', async (msg) => {
     
     if (isSpam) {
       await bot.deleteMessage(chatId, msg.message_id);
+    } else {
+      // Chỉ cập nhật thời gian khi tin nhắn chỉnh sửa không phải spam
+      const currentTime = new Date().getTime();
+      userLastMessageTime.set(userId, currentTime);
     }
   } catch (error) {
     console.error("Lỗi khi xử lý tin nhắn chỉnh sửa:", error);
