@@ -3423,7 +3423,7 @@ cron.schedule('31 7 * * *', async () => {
 bot.onText(/\/homqua/, async (msg) => {
   const chatId = msg.chat.id;
   const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
+  yesterday.setDate(yesterday.getDate() - 2);
   await sendAggregatedData(chatId, yesterday);
 });
 
