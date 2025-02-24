@@ -5041,66 +5041,51 @@ bot.on('message', async (msg) => {
 
 // Danh sách từ khóa spam mở rộng
 const spamKeywords = [
-  // Chửi bậy, tục tĩu
   "lừa đảo", "chó", "dmm", "lồn", "lừa", "địt", "bịp", "campuchia", "bọn điên",
   "súc vật", "vl", "có cl", "cút", "dm", "vkl", "mày", "xạo", "địt cụ", "con căc", "cc", "dốt", "chết", "khốn nạn",
-  // Từ viết tắt
   "đcm", "đmm", "clgt", "vcl", "vloz", "đkm", "cmm", "đậu xanh", "vc", "đcmm",
-  // Thêm các từ khác
   "ngu", "óc chó", "cặc", "lon", "đụ", "mat day", "ku", "như lồn", "chet me", "đb"
 ];
 
-// Danh sách groupId được phép kiểm tra
 const allowedGroupIdss = [-1002208226506, -1002333438294];
 
-
-// Map để lưu thời gian tin nhắn cuối cùng của mỗi user
 const userLastMessageTime = new Map();
+const userSpamCount = new Map(); // Map lưu số lần vi phạm của user
 
-// Kiểm tra tin nhắn spam
 async function checkSpamMessage(msg, messageContent) {
   if (!messageContent) return false;
   
   const lowerCaseMessage = messageContent.toLowerCase();
   const userId = msg.from.id;
   
-  // Kiểm tra quyền admin
   const chatMember = await bot.getChatMember(msg.chat.id, userId);
   if (chatMember.status === 'administrator' || chatMember.status === 'creator') {
     return false;
   }
 
-  // Kiểm tra độ dài tin nhắn (trên 100 từ)
   if (messageContent.split(' ').length > 100) {
     return true;
   }
 
-  // Kiểm tra từ khóa spam
   const containsSpam = spamKeywords.some(keyword => {
     const regex = new RegExp(`\\b${keyword}\\b`, 'i');
     return regex.test(lowerCaseMessage);
   });
 
-  // Kiểm tra thời gian giữa các tin nhắn của cùng một user
   const currentTime = new Date().getTime();
   const lastMessageTime = userLastMessageTime.get(userId) || 0;
   
-  // Nếu thời gian giữa 2 tin nhắn của cùng user < 1 phút
-  if (currentTime - lastMessageTime < 60000) { // 60000ms = 1 phút
-    return true;
-  }
-
+  userLastMessageTime.set(userId, currentTime);
+  
   return containsSpam;
 }
 
-// Xử lý tin nhắn
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const messageContent = msg.text || msg.caption;
   const userId = msg.from.id;
 
-  // Kiểm tra nhóm được phép
-  if (!allowedGroupIdss.includes(chatId)) {
+  if (!allowedGroupIds.includes(chatId)) {
     return;
   }
 
@@ -5108,25 +5093,27 @@ bot.on('message', async (msg) => {
     const isSpam = await checkSpamMessage(msg, messageContent);
     
     if (isSpam) {
-      // Chỉ xóa tin nhắn spam
       await bot.deleteMessage(chatId, msg.message_id);
-    } else {
-      // Chỉ cập nhật thời gian khi tin nhắn không phải spam
-      const currentTime = new Date().getTime();
-      userLastMessageTime.set(userId, currentTime);
+      
+      const count = userSpamCount.get(userId) || 0;
+      userSpamCount.set(userId, count + 1);
+      
+      if (count + 1 >= 2) {
+        await bot.kickChatMember(chatId, userId);
+        userSpamCount.delete(userId);
+      }
     }
   } catch (error) {
     console.error("Lỗi khi xử lý tin nhắn:", error);
   }
 });
 
-// Xử lý tin nhắn chỉnh sửa
 bot.on('edited_message', async (msg) => {
   const chatId = msg.chat.id;
   const messageContent = msg.text || msg.caption;
   const userId = msg.from.id;
 
-  if (!allowedGroupIdss.includes(chatId)) {
+  if (!allowedGroupIds.includes(chatId)) {
     return;
   }
 
@@ -5135,23 +5122,27 @@ bot.on('edited_message', async (msg) => {
     
     if (isSpam) {
       await bot.deleteMessage(chatId, msg.message_id);
-    } else {
-      // Chỉ cập nhật thời gian khi tin nhắn chỉnh sửa không phải spam
-      const currentTime = new Date().getTime();
-      userLastMessageTime.set(userId, currentTime);
+      
+      const count = userSpamCount.get(userId) || 0;
+      userSpamCount.set(userId, count + 1);
+      
+      if (count + 1 >= 2) {
+        await bot.kickChatMember(chatId, userId);
+        userSpamCount.delete(userId);
+      }
     }
   } catch (error) {
     console.error("Lỗi khi xử lý tin nhắn chỉnh sửa:", error);
   }
 });
 
-// Định kỳ xóa dữ liệu cũ trong Map để tránh memory leak
 setInterval(() => {
   const currentTime = new Date().getTime();
   for (const [userId, lastTime] of userLastMessageTime.entries()) {
-    // Xóa dữ liệu của các user không hoạt động trong 5 phút
-    if (currentTime - lastTime > 300000) { // 300000ms = 5 phút
+    if (currentTime - lastTime > 300000) {
       userLastMessageTime.delete(userId);
+      userSpamCount.delete(userId);
     }
   }
-}, 300000); // Chạy mỗi 5 phút
+}, 300000);
+
