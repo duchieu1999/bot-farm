@@ -5051,7 +5051,8 @@ const spamKeywords = [
 ];
 
 // Danh sách groupId được phép kiểm tra
-const allowedGroupIdss = [-1002122969493, -1002094623131];
+const allowedGroupIdss = [-1002208226506, -1002333438294];
+
 
 // Map để lưu thời gian tin nhắn cuối cùng của mỗi user
 const userLastMessageTime = new Map();
