@@ -3423,7 +3423,7 @@ cron.schedule('31 7 * * *', async () => {
 bot.onText(/\/homqua/, async (msg) => {
   const chatId = msg.chat.id;
   const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 2);
+  yesterday.setDate(yesterday.getDate() - 1);
   await sendAggregatedData(chatId, yesterday);
 });
 
@@ -5039,41 +5039,92 @@ bot.on('message', async (msg) => {
   }
 });
 
+// Danh sách từ khóa spam mở rộng
 const spamKeywords = [
-  "lừa đảo", "chó", "dmm", "lồn", "lừa", "bịp", "campuchia", "bọn điên",
-  "súc vật", "vl", "có cl", "cút", "dm", "vkl", "mày", "xạo", "địt cụ", "con căc", "cc", "dốt", "chết", "khốn nạn"
+  // Chửi bậy, tục tĩu
+  "lừa đảo", "chó", "dmm", "lồn", "lừa", "địt", "bịp", "campuchia", "bọn điên",
+  "súc vật", "vl", "có cl", "cút", "dm", "vkl", "mày", "xạo", "địt cụ", "con căc", "cc", "dốt", "chết", "khốn nạn",
+  // Từ viết tắt
+  "đcm", "đmm", "clgt", "vcl", "vloz", "đkm", "cmm", "đậu xanh", "vc", "đcmm",
+  // Thêm các từ khác
+  "ngu", "óc chó", "cặc", "lon", "đụ", "mat day", "ku", "như lồn", "chet me", "đb"
 ];
 
 // Danh sách groupId được phép kiểm tra
-const allowedGroupIdss = [-1002122969493, -1002094623131];
+const allowedGroupIdss = [-1002208226506, -1002333438294];
 
-// Hàm kiểm tra từ khóa spam
-function containsSpamKeywords(messageContent) {
+// Kiểm tra tin nhắn spam
+async function checkSpamMessage(msg, messageContent) {
+  if (!messageContent) return false;
+  
   const lowerCaseMessage = messageContent.toLowerCase();
-  return spamKeywords.some((keyword) => lowerCaseMessage.includes(keyword));
-}
-
-bot.on('message', async (msg) => {
-  const chatId = msg.chat.id;
-  const messageContent = msg.text || msg.caption; // Xử lý cả text và caption (nếu là ảnh/video)
-
-  // Kiểm tra nếu chatId không nằm trong danh sách allowedGroupIds
-  if (!allowedGroupIdss.includes(chatId)) {
-    return; // Bỏ qua nếu không phải là nhóm được phép
+  
+  // Kiểm tra quyền admin
+  const chatMember = await bot.getChatMember(msg.chat.id, msg.from.id);
+  if (chatMember.status === 'administrator' || chatMember.status === 'creator') {
+    return false;
   }
 
-  if (messageContent && containsSpamKeywords(messageContent)) {
-    const userId = msg.from.id;
-    const username = msg.from.username || msg.from.first_name || "người dùng";
+  // Kiểm tra độ dài tin nhắn (trên 100 từ)
+  if (messageContent.split(' ').length > 100) {
+    return true;
+  }
 
-    try {
-      // Xóa tin nhắn chứa từ khóa spam
+  // Kiểm tra thời gian giữa các tin nhắn
+  const currentTime = new Date().getTime();
+  const messageTime = msg.date * 1000;
+  if (currentTime - messageTime < 60000) { // 60000ms = 1 phút
+    return true;
+  }
+
+  // Kiểm tra từ khóa spam
+  const containsSpam = spamKeywords.some(keyword => {
+    // Sử dụng regex để tránh xóa nhầm
+    const regex = new RegExp(`\\b${keyword}\\b`, 'i');
+    return regex.test(lowerCaseMessage);
+  });
+
+  return containsSpam;
+}
+
+// Xử lý tin nhắn
+bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
+  const messageContent = msg.text || msg.caption;
+
+  // Kiểm tra nhóm được phép
+  if (!allowedGroupIdss.includes(chatId)) {
+    return;
+  }
+
+  try {
+    const isSpam = await checkSpamMessage(msg, messageContent);
+    
+    if (isSpam) {
+      // Chỉ xóa tin nhắn spam, không gửi thông báo và không kick
       await bot.deleteMessage(chatId, msg.message_id);
-
-      // Kick người dùng ra khỏi nhóm
-      await bot.kickChatMember(chatId, userId);
-    } catch (error) {
-      console.error("Lỗi khi xử lý tin nhắn spam:", error);
     }
+  } catch (error) {
+    console.error("Lỗi khi xử lý tin nhắn:", error);
+  }
+});
+
+// Xử lý tin nhắn chỉnh sửa
+bot.on('edited_message', async (msg) => {
+  const chatId = msg.chat.id;
+  const messageContent = msg.text || msg.caption;
+
+  if (!allowedGroupIdss.includes(chatId)) {
+    return;
+  }
+
+  try {
+    const isSpam = await checkSpamMessage(msg, messageContent);
+    
+    if (isSpam) {
+      await bot.deleteMessage(chatId, msg.message_id);
+    }
+  } catch (error) {
+    console.error("Lỗi khi xử lý tin nhắn chỉnh sửa:", error);
   }
 });
