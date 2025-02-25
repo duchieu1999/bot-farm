@@ -2701,7 +2701,7 @@ async function processTotalTimesheet(chatId, numDays) {
     startDate.setDate(today.getDate() - numDays);
     startDate.setHours(0, 0, 0, 0);
     const endDate = new Date();
-    endDate.setDate(today.getDate() - 2);
+    endDate.setDate(today.getDate() - 1);
     endDate.setHours(23, 59, 59, 999);
 
     try {
