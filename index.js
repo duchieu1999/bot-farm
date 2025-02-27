@@ -2713,8 +2713,8 @@ async function processTotalTimesheet(chatId, numDays) {
             date: { $gte: startDate, $lte: endDate },
         });
 
-        // Lọc ra các nhóm không thuộc danh sách loại trừ
-const filteredGroupIds = allGroupIds.filter(groupId => !excludedGroupIds.includes(groupId));
+        // Loại bỏ groupId thuộc allowedGroupIds
+        const filteredGroupIds = allGroupIds.filter(groupId => !allowedGroupIds.includes(groupId));
 
         for (const groupId of filteredGroupIds) {
             const bangCongs = await BangCong2.find({
