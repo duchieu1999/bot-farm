@@ -135,7 +135,7 @@ const Member = mongoose.model('Member', MemberSchema);
 const Message = mongoose.model('Message', MessageSchema);
 const DailyTask = mongoose.model('DailyTask', DailyTaskSchema);
 
-const token = '7150645082:AAH-N2VM6qx3iFEhK59YHx2e1oy3Bi1EzXc';
+const token = '7150645082:AAGEZoVexrXYFaOw3Z3KHAc_HagXZo76y3Q';
 const url = 'https://bot-farm-twjg.onrender.com'; // URL của webhook
 const port = process.env.PORT || 3000;
 
