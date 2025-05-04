@@ -2590,7 +2590,7 @@ const otherGroupIds = allGroupIds.filter(id => !excludedGroupIds.includes(id));
 
 
 const managementFees2 = {
-  '-1002198923074': 100000 
+  '-1002446612440': 50000 
 };
 
 const allowedGroupIdsnary = [
