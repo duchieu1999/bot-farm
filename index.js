@@ -3538,6 +3538,7 @@ const groupCodes = {
   "kttn": "-1002004082575",
   "dltc": "-1002123430691",
   "csch": "-1002080535296",
+  "jdfjd": "-1002446612440",
   "cncs": "-1002143712364",
   "bđkn": "-1002128975957",
   "cncs": "-1002080535296",
@@ -3552,6 +3553,7 @@ const groupCodes = {
 const groups = {
   "-1002039100507": "BẢNG CÔNG NHÓM CỘNG ĐỒNG NẮM BẮT CƠ HỘI",
   "-1002004082575": "BẢNG CÔNG NHÓM NÂNG CAO ĐỜI SỐNG",
+  "-1002446612440": "tele",
   "-1002123430691": "BẢNG CÔNG NHÓM DẪN LỐI THÀNH CÔNG",
   "-1002143712364": "NHÓM CHIA SẺ KINH NGHIỆM",
   "-1002128975957": "BẢNG CÔNG NHÓM BƯỚC ĐI KHỞI NGHIỆP",
