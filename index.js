@@ -2596,7 +2596,7 @@ const managementFees2 = {
 const allowedGroupIdsnary = [
   -1002382659317 ];
 const allowedGroupIds2 = [
-  -1002198923074
+  -1002446612440
 ];
 
 async function processAndDistributeTimesheets2(chatId, isToday) {
