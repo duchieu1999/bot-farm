@@ -1979,7 +1979,7 @@ async function processSubmission(msg, targetMsg) {
   const fullName = lastName ? `${firstName} ${lastName}` : firstName;
 
   // Xác định giá dựa trên groupId
-  let pricePerQuay = 500;
+  let pricePerQuay = 350;
   let pricePerKeo = 1000;
   let pricePerBill = 3000;
   let pricePerAnh = 3000;
@@ -1994,7 +1994,7 @@ async function processSubmission(msg, targetMsg) {
       pricePerKeo = 1500;
       break;
     case -1002360155473:
-      pricePerKeo = 500;
+      pricePerKeo = 350;
       pricePerQuay = 1000;
       pricePerBill = 1500;
       pricePerAnh = 1500;
@@ -2021,7 +2021,7 @@ async function processSubmission(msg, targetMsg) {
       break;
     default:
       pricePerKeo = 1000;
-      pricePerQuay = 500;
+      pricePerQuay = 350;
   }
 
   const totalMoney = (quay * pricePerQuay) + (keo * pricePerKeo) + (bill * pricePerBill) + (anh * pricePerAnh) + (video * pricePerVideo);
