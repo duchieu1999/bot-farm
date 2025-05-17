@@ -1802,7 +1802,7 @@ async function addGroup(chatId, messageId) {
     // Tạo group mới với giá mặc định
     const newGroup = new Group({
       groupId,
-      pricePerQuay: 500,
+      pricePerQuay: 350,
       pricePerKeo: 1000,
       pricePerBill: 3000,
       pricePerAnh: 3000,
@@ -2015,6 +2015,7 @@ async function processSubmission(msg, targetMsg) {
     case -1002457468797:
     case -1002382659317: 
     case -1002208226506:
+    case -1002446612440:
     case -1002080535296:
       pricePerKeo = 1000;
       pricePerQuay = 350;
