@@ -1,0 +1,1616 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trò Chơi Câu Cá</title>
+    <style>
+        :root {
+            --primary-color: #5D5CDE;
+            --text-color: #333;
+            --bg-color: #fff;
+            --shadow-color: rgba(0, 0, 0, 0.2);
+            --water-color: #58b8d9;
+            --water-deep-color: #2980b9;
+            --land-color: #8B5A2B;
+            --sky-color-top: #FF9370;
+            --sky-color-bottom: #FFC2A6;
+        }
+
+        .dark {
+            --text-color: #f5f5f5;
+            --bg-color: #181818;
+            --shadow-color: rgba(0, 0, 0, 0.5);
+            --water-color: #3c7b95;
+            --water-deep-color: #1c5a7a;
+            --land-color: #694329;
+            --sky-color-top: #CF5A41;
+            --sky-color-bottom: #D87F62;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+            transition: background-color 0.3s;
+            padding: 0 10px;
+        }
+
+        .game-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px var(--shadow-color);
+        }
+
+        #gameCanvas {
+            width: 100%;
+            height: auto;
+            display: block;
+            touch-action: none;
+        }
+
+        .controls {
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 30px;
+            background-color: var(--primary-color);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 3px 8px rgba(93, 92, 222, 0.3);
+            min-width: 120px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 12px rgba(93, 92, 222, 0.5);
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+            box-shadow: 0 2px 5px rgba(93, 92, 222, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        .btn.bite-alert {
+            animation: pulseButton 0.8s infinite;
+            background-color: #ff3333;
+        }
+
+        @keyframes pulseButton {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 800px;
+            margin: 10px auto;
+            font-size: 18px;
+            font-weight: bold;
+            padding: 0 10px;
+        }
+
+        .score-area {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .message-area {
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            font-size: 16px;
+            max-width: 80%;
+            z-index: 100;
+        }
+
+        .show-message {
+            opacity: 1;
+        }
+
+        @media (max-width: 500px) {
+            .controls {
+                gap: 10px;
+            }
+            
+            .btn {
+                padding: 8px 15px;
+                font-size: 14px;
+                min-width: 100px;
+            }
+            
+            .stats {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="stats">
+        <div class="score-area">
+            <span>Điểm: </span>
+            <span id="score">0</span>
+        </div>
+        <div class="score-area">
+            <span>Cá Đã Câu: </span>
+            <span id="fishCount">0</span>
+        </div>
+    </div>
+    
+    <div class="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="messageArea" class="message-area"></div>
+    </div>
+    
+    <div class="controls">
+        <button id="castBtn" class="btn">Quăng Cần</button>
+        <button id="pullBtn" class="btn" disabled>Giật Cần</button>
+    </div>
+
+    <script>
+        // Check for dark mode preference
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+
+        // Game variables
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const castBtn = document.getElementById('castBtn');
+        const pullBtn = document.getElementById('pullBtn');
+        const scoreDisplay = document.getElementById('score');
+        const fishCountDisplay = document.getElementById('fishCount');
+        const messageArea = document.getElementById('messageArea');
+
+        // Set canvas dimensions with 16:9 aspect ratio
+        const setCanvasDimensions = () => {
+            const containerWidth = canvas.parentElement.clientWidth;
+            canvas.width = containerWidth;
+            canvas.height = containerWidth * 0.6;
+        };
+        
+        // Initialize canvas
+        setCanvasDimensions();
+        window.addEventListener('resize', setCanvasDimensions);
+
+        // Game state
+        let gameState = {
+            fishImage: new Image(),
+            blueFishImage: new Image(),
+            rodCast: false,
+            hookPosition: { x: 0, y: 0 },
+            rodPosition: { x: 0, y: 0 },
+            fishes: [],
+            hideFish: true, // Ẩn cá đang bơi
+            score: 0,
+            fishCount: 0,
+            fishBiting: false,
+            biteTimer: null,
+            fishCaught: null,
+            waterRipples: [],
+            baitRipples: [], // Ripples around bait
+            castStrength: 0,
+            rodAngle: Math.PI / 4,
+            pullRodAngle: Math.PI / 2, // 90 degrees for pull animation
+            baitInWater: false,
+            timeOfDay: 0.8, // 0-1 for day cycle (0.8 for sunset)
+            daySpeed: 0.0001,
+            fishJumps: [],
+            tutorial: true,
+            algae: [],
+            seaweed: [], // Thêm rong biển
+            underwaterParticles: [],
+            rodTiltAmount: 0, // Rod tilt instead of flex
+            rodTiltTarget: 0,
+            rodTiltSpeed: 0.1,
+            biteIntensity: 0,
+            lastBitePulse: 0,
+            catchDifficulty: 0.6, // Difficulty factor (0-1)
+            catchTimer: 0,
+            minWaitTimeForBite: 10, // Reduced from 30 to 10 seconds
+            maxWaitTimeForBite: 60, // Reduced from 180 to 60 seconds
+            currentWaitTime: 0,
+            biteCountdown: 0,
+            rodShakeTimer: 0,
+            rodShakeIntensity: 0,
+            isPulling: false,
+            pullAnimationTime: 0,
+            fishFlopping: false,
+            flopIntensity: 0,
+            flopTimer: 0,
+            pullAnimationDuration: 0.6, // Giảm thời gian kéo cá (từ 1.2 xuống 0.6 giây)
+            pullAnimationCurve: 0.6, // Giảm đường cong Easing để nhanh hơn (từ 0.8 xuống 0.6)
+            nibbleTimer: 0, // Thời gian giữa các lần cá đớp mồi nhẹ
+            nibbleIntensity: 0, // Cường độ cá đớp mồi nhẹ
+            bobberSize: 8, // Tăng kích thước phao
+            biteProbability: 0.3, // Tăng xác suất cá cắn câu (30% thay vì 10%)
+            showBiteMessage: true, // Hiển thị thông báo khi cá cắn câu
+            hookFallSpeed: 15 // Tăng tốc độ rơi của phao (từ 5 lên 15)
+        };
+
+        // Load fish images
+        gameState.fishImage.src = 'https://pfst.cf2.poecdn.net/base/image/105caa7836e7b2db7e60f1b3899b37476ba7fc1549d1d6bf04d7d5aedb669b78?w=1024&h=1024';
+        gameState.blueFishImage.src = 'https://pfst.cf2.poecdn.net/base/image/319250952e344e44e066876d5a76899163610250ad8c748553178d2ac029b898?w=1024&h=1024';
+        
+        // Fish class
+        class Fish {
+            constructor(x, y, size, speed, direction, isBlueFish = false) {
+                this.x = x;
+                this.y = y;
+                this.size = size;
+                this.speed = speed * 0.4; // Giảm tốc độ cá xuống 40%
+                this.direction = direction; // 1 for right, -1 for left
+                this.wobble = 0;
+                this.wobbleSpeed = Math.random() * 0.03 + 0.01; // Giảm tốc độ dao động
+                this.wobbleAmount = Math.random() * 1.5 + 0.5; // Giảm biên độ dao động
+                this.interested = false;
+                this.approachSpeed = 0;
+                this.hookDistance = Infinity;
+                this.biting = false;
+                this.caught = false;
+                this.visible = true;
+                this.cautious = Math.random() < 0.7; // Most fish are cautious
+                this.interestLevel = 0; // How interested the fish is (0-1)
+                this.bitePower = Math.random() * 0.5 + 0.5; // How hard the fish bites/pulls
+                this.zigzagTimer = 0;
+                this.zigzagDirection = Math.random() > 0.5 ? 1 : -1;
+                this.isBlueFish = isBlueFish; // New blue fish type flag
+                this.flopAngle = 0; // For flopping animation
+                this.flopSpeed = Math.random() * 0.1 + 0.05;
+                this.nibbleTimer = 0; // Thời gian đớp mồi nhẹ
+                this.isNibbling = false; // Đang đớp mồi nhẹ
+                
+                // Blue fish are worth more points
+                if (this.isBlueFish) {
+                    this.pointValue = Math.floor(this.size * 2); // Blue fish worth double
+                } else {
+                    this.pointValue = Math.floor(this.size);
+                }
+            }
+
+            update(deltaTime) {
+                // If caught and flopping, update flop animation
+                if (this.caught && gameState.fishFlopping) {
+                    this.flopAngle += this.flopSpeed * gameState.flopIntensity;
+                    return;
+                }
+                
+                if (this.caught) {
+                    // Fish is caught, move with the hook
+                    this.x = gameState.hookPosition.x;
+                    this.y = gameState.hookPosition.y;
+                    return;
+                }
+
+                // Fish movement
+                this.wobble += this.wobbleSpeed;
+                const wobbleOffset = Math.sin(this.wobble) * this.wobbleAmount;
+                
+                if (!this.interested) {
+                    // Normal fish movement
+                    this.x += this.speed * this.direction;
+                    this.y += wobbleOffset * 0.1;
+                    
+                    // Ensure fish stays underwater
+                    const waterSurface = canvas.height * 0.6;
+                    if (this.y < waterSurface + this.size/2) {
+                        this.y = waterSurface + this.size/2;
+                    }
+                    
+                    // Check if fish is out of bounds
+                    if (this.x < -this.size || this.x > canvas.width + this.size) {
+                        this.direction *= -1;
+                        this.x += this.speed * this.direction * 2;
+                    }
+                    
+                    // Check if hook is in water and calculate distance
+                    if (gameState.baitInWater) {
+                        const dx = gameState.hookPosition.x - this.x;
+                        const dy = gameState.hookPosition.y - this.y;
+                        this.hookDistance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        // Cá đớp mồi nhẹ (nibble) - tạo cảm giác có cá dưới nước
+                        if (this.hookDistance < 50 && !this.isNibbling && !gameState.fishBiting && Math.random() < 0.004) { // Tăng xác suất
+                            this.isNibbling = true;
+                            this.nibbleTimer = Math.random() * 1 + 0.5; // 0.5-1.5 giây
+                            gameState.nibbleIntensity = Math.random() * 0.15 + 0.05; // Độ mạnh nhẹ
+                            
+                            // Tạo sóng nhỏ khi cá đớp mồi nhẹ
+                            gameState.waterRipples.push({
+                                x: gameState.hookPosition.x,
+                                y: canvas.height * 0.6,
+                                size: 0,
+                                maxSize: 10,
+                                speed: 0.7
+                            });
+                        }
+                        
+                        // Cập nhật hành vi đớp mồi nhẹ
+                        if (this.isNibbling) {
+                            this.nibbleTimer -= deltaTime;
+                            if (this.nibbleTimer <= 0) {
+                                this.isNibbling = false;
+                                gameState.nibbleIntensity = 0;
+                            }
+                        }
+                        
+                        // Fish gets interested if hook is close, but only occasionally and after waiting
+                        if (this.hookDistance < 120 && Math.random() < 0.001 && gameState.currentWaitTime > gameState.minWaitTimeForBite) {
+                            // Tăng xác suất cá quan tâm đến mồi
+                            if (Math.random() < 0.3) {
+                                this.interested = true;
+                                this.approachSpeed = this.speed * 0.6; // Slower approach
+                                gameState.biteCountdown = Math.random() * 10 + 5; // Giảm thời gian chờ (5-15 giây)
+                            }
+                        }
+                    }
+                } else {
+                    // Fish is interested in the hook
+                    if (gameState.baitInWater) {
+                        const dx = gameState.hookPosition.x - this.x;
+                        const dy = gameState.hookPosition.y - this.y;
+                        this.hookDistance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        // Update interest level based on distance
+                        this.interestLevel = Math.max(0, 1 - (this.hookDistance / 120));
+                        
+                        // Cautious fish approach slowly and may lose interest
+                        if (this.cautious) {
+                            // Zigzag approach
+                            this.zigzagTimer += deltaTime;
+                            if (this.zigzagTimer > 2) {
+                                this.zigzagDirection *= -1;
+                                this.zigzagTimer = 0;
+                            }
+                            
+                            // Calculate approach vector with zigzag
+                            const zigzagOffsetX = Math.sin(this.zigzagTimer * Math.PI) * 10 * this.zigzagDirection;
+                            
+                            // Approach slowly and cautiously
+                            this.direction = dx > 0 ? 1 : -1;
+                            this.x += (dx * this.approachSpeed * 0.008) + zigzagOffsetX * deltaTime * 0.5; // Tiếp cận chậm hơn
+                            this.y += dy * this.approachSpeed * 0.008; // Tiếp cận chậm hơn
+                            
+                            // Ensure fish stays underwater
+                            const waterSurface = canvas.height * 0.6;
+                            if (this.y < waterSurface + this.size/2) {
+                                this.y = waterSurface + this.size/2;
+                            }
+                            
+                            // May lose interest if startled
+                            if (Math.random() < 0.001 * deltaTime * 60) {
+                                this.interested = false;
+                                return;
+                            }
+                        } else {
+                            // More direct approach for bold fish
+                            this.direction = dx > 0 ? 1 : -1;
+                            this.x += dx * this.approachSpeed * 0.015; // Tiếp cận chậm hơn
+                            this.y += dy * this.approachSpeed * 0.015; // Tiếp cận chậm hơn
+                            
+                            // Ensure fish stays underwater
+                            const waterSurface = canvas.height * 0.6;
+                            if (this.y < waterSurface + this.size/2) {
+                                this.y = waterSurface + this.size/2;
+                            }
+                        }
+                        
+                        // Update bite countdown
+                        if (this.hookDistance < 30) {
+                            gameState.biteCountdown -= deltaTime;
+                            
+                            // Fish might bite if timer expires (tăng xác suất)
+                            if (gameState.biteCountdown <= 0 && !gameState.fishBiting && Math.random() < gameState.biteProbability) {
+                                this.biting = true;
+                                gameState.fishBiting = true;
+                                gameState.biteIntensity = this.bitePower;
+                                
+                                // Create ripple at bite location
+                                gameState.waterRipples.push({
+                                    x: gameState.hookPosition.x,
+                                    y: canvas.height * 0.6,
+                                    size: 0,
+                                    maxSize: 40, // Tăng kích thước sóng khi cá cắn câu
+                                    speed: 1.5
+                                });
+                                
+                                // Shake the rod when fish bites
+                                gameState.rodShakeIntensity = 0.3; // Tăng độ rung cần
+                                gameState.rodShakeTimer = 4; // Tăng thời gian rung
+                                
+                                // Add pulse animation to pull button
+                                pullBtn.classList.add('bite-alert');
+                                
+                                // Show bite message
+                                if (gameState.showBiteMessage) {
+                                    showMessage("Cá đang cắn câu! Giật cần ngay!", 4000);
+                                }
+                                
+                                // Enable pull button
+                                pullBtn.disabled = false;
+                                
+                                // Set timeout for fish to stop biting if not caught
+                                gameState.biteTimer = setTimeout(() => {
+                                    if (!this.caught) {
+                                        this.biting = false;
+                                        this.interested = false;
+                                        gameState.fishBiting = false;
+                                        pullBtn.disabled = true;
+                                        pullBtn.classList.remove('bite-alert');
+                                        gameState.rodShakeIntensity = 0;
+                                        gameState.biteIntensity = 0;
+                                        showMessage("Cá bơi đi mất rồi!", 2000);
+                                    }
+                                }, 6000); // Tăng thời gian cắn câu lên 6 giây
+                            }
+                        }
+                    } else {
+                        // If hook is removed from water, fish loses interest
+                        this.interested = false;
+                    }
+                }
+            }
+
+            draw() {
+                // Chỉ vẽ cá khi bị bắt hoặc không ẩn
+                if (!this.visible || (gameState.hideFish && !this.caught)) return;
+                
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                
+                // Add flop rotation if caught and flopping
+                if (this.caught && gameState.fishFlopping) {
+                    ctx.rotate(Math.sin(this.flopAngle) * 0.5);
+                }
+                
+                // Flip fish based on direction - fish now face correctly in their swimming direction
+                ctx.scale(-this.direction, 1);
+                
+                // Draw fish using the loaded image based on type
+                const fishWidth = this.size * 1.5;
+                const fishHeight = this.size;
+                
+                if (this.isBlueFish) {
+                    ctx.drawImage(gameState.blueFishImage, -fishWidth / 2, -fishHeight / 2, fishWidth, fishHeight);
+                } else {
+                    ctx.drawImage(gameState.fishImage, -fishWidth / 2, -fishHeight / 2, fishWidth, fishHeight);
+                }
+                
+                ctx.restore();
+            }
+        }
+
+        // Jumping fish effect
+        class FishJump {
+            constructor(x) {
+                this.x = x;
+                this.y = canvas.height * 0.6;
+                this.size = Math.random() * 20 + 10;
+                this.time = 0;
+                this.duration = Math.random() * 1 + 1.5;
+                this.height = Math.random() * 60 + 60;
+                this.direction = Math.random() > 0.5 ? 1 : -1; // Fish direction
+                this.horizontalDistance = Math.random() * 100 + 50; // Distance to travel horizontally
+                this.splashRipples = [];
+                this.isBlueFish = Math.random() < 0.3; // 30% chance to be a blue fish
+            }
+            
+            update(deltaTime) {
+                this.time += deltaTime;
+                
+                // Create splash when fish emerges or returns to water
+                if (this.time <= 0.1 || (this.time >= this.duration - 0.1 && this.time <= this.duration)) {
+                    this.splashRipples.push({
+                        x: this.getPositionX(),
+                        y: canvas.height * 0.6,
+                        size: 0,
+                        maxSize: 20,
+                        speed: 1.5
+                    });
+                }
+                
+                // Update ripples
+                for (let i = this.splashRipples.length - 1; i >= 0; i--) {
+                    const ripple = this.splashRipples[i];
+                    ripple.size += ripple.speed;
+                    
+                    if (ripple.size >= ripple.maxSize) {
+                        this.splashRipples.splice(i, 1);
+                    }
+                }
+                
+                return this.time <= this.duration;
+            }
+            
+            // Get the current X position based on time
+            getPositionX() {
+                const progress = this.time / this.duration;
+                return this.x + this.horizontalDistance * progress * this.direction;
+            }
+            
+            draw() {
+                const progress = this.time / this.duration;
+                const jumpHeight = Math.sin(progress * Math.PI) * this.height;
+                const x = this.getPositionX();
+                const y = canvas.height * 0.6 - jumpHeight;
+                
+                // Draw splash ripples
+                for (const ripple of this.splashRipples) {
+                    ctx.beginPath();
+                    ctx.arc(ripple.x, ripple.y, ripple.size, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+                
+                // Only draw fish if it's above water
+                if (jumpHeight > 0) {
+                    ctx.save();
+                    ctx.translate(x, y);
+                    
+                    // Calculate angle based on arc trajectory
+                    const angleOffset = (progress - 0.5) * Math.PI * 0.5; // -45 to +45 degrees
+                    ctx.rotate(angleOffset * this.direction);
+                    
+                    // Apply scale to flip the fish based on direction
+                    ctx.scale(-this.direction, 1);
+                    
+                    // Draw the fish image
+                    const fishWidth = this.size * 1.5;
+                    const fishHeight = this.size;
+                    
+                    if (this.isBlueFish) {
+                        ctx.drawImage(gameState.blueFishImage, -fishWidth / 2, -fishHeight / 2, fishWidth, fishHeight);
+                    } else {
+                        ctx.drawImage(gameState.fishImage, -fishWidth / 2, -fishHeight / 2, fishWidth, fishHeight);
+                    }
+                    
+                    ctx.restore();
+                }
+            }
+        }
+
+        // Initialize fish
+        function initFish() {
+            gameState.fishes = [];
+            const fishCount = Math.floor(Math.random() * 2) + 3; // 3-4 cá
+            
+            for (let i = 0; i < fishCount; i++) {
+                const size = Math.random() * 20 + 15;
+                const x = Math.random() * canvas.width;
+                const y = canvas.height * 0.7 + Math.random() * (canvas.height * 0.2); // Keep fish deeper underwater
+                const speed = Math.random() * 0.4 + 0.2; // Giảm tốc độ di chuyển
+                const direction = Math.random() > 0.5 ? 1 : -1;
+                const isBlueFish = Math.random() < 0.3; // 30% chance to be a blue fish
+                
+                gameState.fishes.push(new Fish(x, y, size, speed, direction, isBlueFish));
+            }
+        }
+
+        // Initialize underwater elements
+        function initUnderwaterElements() {
+            // Create algae - thêm nhiều rêu hơn
+            gameState.algae = [];
+            const algaeCount = Math.floor(Math.random() * 15) + 20; // Tăng số lượng
+            
+            for (let i = 0; i < algaeCount; i++) {
+                const x = Math.random() * canvas.width;
+                const baseY = canvas.height * 0.95;
+                const height = Math.random() * 40 + 20;
+                const width = Math.random() * 15 + 5;
+                const segments = Math.floor(Math.random() * 3) + 3;
+                const waveSpeed = Math.random() * 0.01 + 0.005;
+                const wavePhase = Math.random() * Math.PI * 2;
+                const color = Math.random() < 0.7 ? 
+                    `rgba(${Math.floor(Math.random()*50)+50}, ${Math.floor(Math.random()*100)+150}, ${Math.floor(Math.random()*50)+50}, 0.7)` : 
+                    `rgba(${Math.floor(Math.random()*50)+100}, ${Math.floor(Math.random()*50)+50}, ${Math.floor(Math.random()*50)+100}, 0.7)`;
+                
+                gameState.algae.push({
+                    x, baseY, height, width, segments, waveSpeed, wavePhase, color
+                });
+            }
+            
+            // Thêm rong biển
+            gameState.seaweed = [];
+            const seaweedCount = Math.floor(Math.random() * 10) + 10;
+            
+            for (let i = 0; i < seaweedCount; i++) {
+                const x = Math.random() * canvas.width;
+                const baseY = canvas.height;
+                const height = Math.random() * 80 + 40; // Rong biển cao hơn
+                const width = Math.random() * 20 + 10;
+                const segments = Math.floor(Math.random() * 5) + 5; // Nhiều đoạn hơn
+                const waveSpeed = Math.random() * 0.008 + 0.002;
+                const wavePhase = Math.random() * Math.PI * 2;
+                const color = `rgba(${Math.floor(Math.random()*30)+20}, ${Math.floor(Math.random()*80)+100}, ${Math.floor(Math.random()*30)+20}, 0.8)`;
+                
+                gameState.seaweed.push({
+                    x, baseY, height, width, segments, waveSpeed, wavePhase, color
+                });
+            }
+            
+            // Create underwater particles
+            gameState.underwaterParticles = [];
+            const particleCount = Math.floor(Math.random() * 30) + 20;
+            
+            for (let i = 0; i < particleCount; i++) {
+                const x = Math.random() * canvas.width;
+                const y = canvas.height * 0.6 + Math.random() * (canvas.height * 0.4);
+                const size = Math.random() * 3 + 1;
+                const speed = Math.random() * 0.2 + 0.1;
+                const alpha = Math.random() * 0.5 + 0.2;
+                
+                gameState.underwaterParticles.push({
+                    x, y, size, speed, alpha
+                });
+            }
+        }
+
+        // Generate random fish jumps
+        function generateFishJump() {
+            // Less frequent fish jumps
+            if (Math.random() < 0.001) { // Giảm tần suất cá nhảy
+                const x = Math.random() * canvas.width;
+                gameState.fishJumps.push(new FishJump(x));
+            }
+        }
+
+        // Create bait ripple effect - sóng nước lăn tăn từ phao câu
+        function createBaitRipples() {
+            if (gameState.baitInWater && Math.random() < 0.1) {
+                // Tạo gợn sóng tròn xung quanh phao câu
+                gameState.baitRipples.push({
+                    x: gameState.hookPosition.x,
+                    y: canvas.height * 0.6, // Mặt nước
+                    size: 0,
+                    maxSize: Math.random() * 15 + 5,
+                    speed: Math.random() * 0.5 + 0.2,
+                    alpha: Math.random() * 0.4 + 0.1
+                });
+            }
+        }
+
+        // Update bait ripples
+        function updateBaitRipples() {
+            for (let i = gameState.baitRipples.length - 1; i >= 0; i--) {
+                const ripple = gameState.baitRipples[i];
+                ripple.size += ripple.speed;
+                ripple.alpha -= 0.01;
+                
+                if (ripple.size >= ripple.maxSize || ripple.alpha <= 0) {
+                    gameState.baitRipples.splice(i, 1);
+                }
+            }
+        }
+
+        // Draw bait ripples
+        function drawBaitRipples() {
+            for (const ripple of gameState.baitRipples) {
+                ctx.beginPath();
+                ctx.arc(ripple.x, ripple.y, ripple.size, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(255, 255, 255, ${ripple.alpha})`;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        }
+
+        // Show message
+        function showMessage(text, duration = 2000) {
+            messageArea.textContent = text;
+            messageArea.classList.add('show-message');
+            
+            setTimeout(() => {
+                messageArea.classList.remove('show-message');
+            }, duration);
+        }
+
+        // Water ripple effect
+        function updateWaterRipples() {
+            for (let i = gameState.waterRipples.length - 1; i >= 0; i--) {
+                const ripple = gameState.waterRipples[i];
+                ripple.size += ripple.speed;
+                
+                if (ripple.size >= ripple.maxSize) {
+                    gameState.waterRipples.splice(i, 1);
+                }
+            }
+        }
+
+        // Draw water ripples
+        function drawWaterRipples() {
+            for (const ripple of gameState.waterRipples) {
+                ctx.beginPath();
+                ctx.arc(ripple.x, ripple.y, ripple.size, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+        }
+
+        // Update underwater particles
+        function updateUnderwaterParticles() {
+            for (let i = gameState.underwaterParticles.length - 1; i >= 0; i--) {
+                const particle = gameState.underwaterParticles[i];
+                particle.y -= particle.speed * 0.2;
+                particle.x += Math.sin(Date.now() * 0.001 + i) * 0.2;
+                
+                // Reset particles that reach the surface
+                if (particle.y < canvas.height * 0.6) {
+                    particle.y = canvas.height;
+                    particle.x = Math.random() * canvas.width;
+                }
+            }
+        }
+
+        // Draw underwater particles
+        function drawUnderwaterParticles() {
+            for (const particle of gameState.underwaterParticles) {
+                ctx.beginPath();
+                ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 255, 255, ${particle.alpha})`;
+                ctx.fill();
+            }
+        }
+
+        // Draw algae
+        function drawAlgae(timestamp) {
+            for (const algae of gameState.algae) {
+                ctx.beginPath();
+                
+                // Start at the base
+                let startX = algae.x;
+                let startY = algae.baseY;
+                
+                ctx.moveTo(startX, startY);
+                
+                // Draw each segment with a wave effect
+                for (let i = 0; i < algae.segments; i++) {
+                    const segmentHeight = algae.height / algae.segments;
+                    const t = i / (algae.segments - 1);
+                    
+                    // Calculate wave offset based on time
+                    const waveOffset = Math.sin(timestamp * 0.001 * algae.waveSpeed + algae.wavePhase) * 
+                                       (t * algae.width * 1.5); // More movement at the top
+                    
+                    const nextX = startX + waveOffset;
+                    const nextY = startY - segmentHeight;
+                    
+                    // Draw curved segment
+                    ctx.quadraticCurveTo(
+                        startX + waveOffset * 0.5, 
+                        startY - segmentHeight * 0.5,
+                        nextX, 
+                        nextY
+                    );
+                    
+                    startX = nextX;
+                    startY = nextY;
+                }
+                
+                // Draw back down for a closed shape
+                startY = algae.baseY - algae.height;
+                for (let i = algae.segments - 1; i >= 0; i--) {
+                    const segmentHeight = algae.height / algae.segments;
+                    const t = i / (algae.segments - 1);
+                    
+                    // Calculate wave offset based on time (slightly different phase)
+                    const waveOffset = Math.sin(timestamp * 0.001 * algae.waveSpeed + algae.wavePhase + 0.2) * 
+                                       (t * algae.width * 1.5); // More movement at the top
+                    
+                    const nextX = algae.x + waveOffset + algae.width * 0.8;
+                    const nextY = startY + segmentHeight;
+                    
+                    // Draw curved segment
+                    ctx.quadraticCurveTo(
+                        algae.x + waveOffset * 0.5 + algae.width * 0.8, 
+                        startY + segmentHeight * 0.5,
+                        nextX, 
+                        nextY
+                    );
+                    
+                    startX = nextX;
+                    startY = nextY;
+                }
+                
+                ctx.closePath();
+                ctx.fillStyle = algae.color;
+                ctx.fill();
+            }
+        }
+
+        // Draw seaweed (rong biển)
+        function drawSeaweed(timestamp) {
+            for (const seaweed of gameState.seaweed) {
+                ctx.beginPath();
+                
+                // Start at the base
+                let startX = seaweed.x;
+                let startY = seaweed.baseY;
+                
+                ctx.moveTo(startX, startY);
+                
+                // Draw undulating line for seaweed
+                for (let i = 1; i <= seaweed.segments; i++) {
+                    const segmentHeight = seaweed.height / seaweed.segments;
+                    const t = i / seaweed.segments;
+                    
+                    // Wave motion with time
+                    const waveOffset = Math.sin(timestamp * 0.0005 * seaweed.waveSpeed + seaweed.wavePhase + t * Math.PI) * 
+                                      (t * seaweed.width * 2); // Increases with height
+                    
+                    const nextX = seaweed.x + waveOffset;
+                    const nextY = startY - segmentHeight;
+                    
+                    // Create curved seaweed segment
+                    ctx.quadraticCurveTo(
+                        seaweed.x + waveOffset * 0.5, 
+                        startY - segmentHeight * 0.5,
+                        nextX, 
+                        nextY
+                    );
+                    
+                    startX = nextX;
+                    startY = nextY;
+                }
+                
+                // Draw back to create a full shape (thinner at the top)
+                const tipWidth = seaweed.width * 0.3;
+                const tipX = startX;
+                const tipY = startY;
+                
+                // Draw path back down on the right side
+                startX = tipX + tipWidth;
+                startY = tipY;
+                
+                for (let i = seaweed.segments; i >= 1; i--) {
+                    const segmentHeight = seaweed.height / seaweed.segments;
+                    const t = i / seaweed.segments;
+                    
+                    // Wave motion with time (slightly out of phase)
+                    const waveOffset = Math.sin(timestamp * 0.0005 * seaweed.waveSpeed + seaweed.wavePhase + Math.PI * 0.1 + t * Math.PI) * 
+                                      (t * seaweed.width * 2); // Increases with height
+                    
+                    const widthAtSegment = seaweed.width * (0.3 + 0.7 * t);
+                    const nextX = seaweed.x + waveOffset + widthAtSegment;
+                    const nextY = seaweed.baseY - (segmentHeight * i);
+                    
+                    // Create curved seaweed segment
+                    ctx.quadraticCurveTo(
+                        seaweed.x + waveOffset * 0.5 + widthAtSegment * 1.2, 
+                        nextY + segmentHeight * 0.5,
+                        nextX, 
+                        nextY
+                    );
+                    
+                    startX = nextX;
+                    startY = nextY;
+                }
+                
+                ctx.closePath();
+                ctx.fillStyle = seaweed.color;
+                ctx.fill();
+            }
+        }
+
+        // Draw fishing rod with rigid physics
+        function drawFishingRod() {
+            // Set appropriate rod angle based on state
+            let currentRodAngle = -gameState.rodAngle; // Đảo ngược góc để cần câu hướng lên
+            
+            if (gameState.isPulling) {
+                // Interpolate angle during pull animation
+                const pullProgress = Math.min(gameState.pullAnimationTime / 0.5, 1); // 0.5 seconds for pull animation
+                currentRodAngle = -gameState.rodAngle + (-gameState.pullRodAngle + gameState.rodAngle) * pullProgress;
+            } else if (gameState.fishBiting) {
+                // Rod tilts when fish bites
+                // Add random shake when fish bites
+                if (gameState.rodShakeTimer > 0) {
+                    gameState.rodShakeTimer -= 0.05;
+                    gameState.rodTiltTarget = -0.2 + Math.sin(Date.now() * 0.01) * 0.1;
+                } else {
+                    gameState.rodShakeIntensity *= 0.95;
+                    gameState.rodTiltTarget = 0;
+                }
+            } else if (gameState.rodCast) {
+                // Rod is cast, slight tilt
+                gameState.rodTiltTarget = -0.1;
+                gameState.rodShakeIntensity = 0;
+            } else {
+                // Rod is not cast, no tilt
+                gameState.rodTiltTarget = 0;
+                gameState.rodShakeIntensity = 0;
+            }
+            
+            // Smooth transition for rod tilt
+            gameState.rodTiltAmount += (gameState.rodTiltTarget - gameState.rodTiltAmount) * gameState.rodTiltSpeed;
+            
+            const rodLength = canvas.height * 0.25;
+            const rodWidth = 5;
+            
+            // Calculate rod position with potential shake
+            const shakeX = Math.random() * gameState.rodShakeIntensity * 10 - gameState.rodShakeIntensity * 5;
+            const shakeY = Math.random() * gameState.rodShakeIntensity * 10 - gameState.rodShakeIntensity * 5;
+            
+            const rodX = gameState.rodPosition.x + shakeX;
+            const rodY = gameState.rodPosition.y + shakeY;
+            
+            // Draw rigid rod
+            ctx.save();
+            ctx.translate(rodX, rodY);
+            
+            // Apply tilt (rotation)
+            ctx.rotate(currentRodAngle + gameState.rodTiltAmount);
+            
+            // Rod base
+            ctx.fillStyle = '#8B4513';
+            ctx.fillRect(-10, -5, 20, rodWidth * 2);
+            
+            // Rod body
+            ctx.fillStyle = '#A0522D';
+            ctx.fillRect(0, -rodWidth / 2, rodLength, rodWidth);
+            
+            // Rod tip
+            ctx.fillStyle = '#D2B48C';
+            ctx.beginPath();
+            ctx.arc(rodLength, 0, rodWidth / 2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+            
+            // Fishing line
+            if (gameState.rodCast || gameState.isPulling) {
+                drawFishingLine(rodX, rodY, currentRodAngle);
+            }
+        }
+
+        // Draw fishing line with physics
+        function drawFishingLine(rodX, rodY, currentRodAngle) {
+            // Calculate rod tip position
+            const rodLength = canvas.height * 0.25;
+            const tipX = rodX + Math.cos(currentRodAngle) * rodLength;
+            const tipY = rodY + Math.sin(currentRodAngle) * rodLength;
+            
+            const startX = tipX;
+            const startY = tipY;
+            
+            // Apply cá đớp mồi nhẹ effects
+            let endX = gameState.hookPosition.x;
+            let endY = gameState.hookPosition.y;
+            
+            if (gameState.nibbleIntensity > 0) {
+                // Phao câu di chuyển nhẹ khi có cá đớp mồi
+                endX += Math.sin(Date.now() * 0.01) * gameState.nibbleIntensity * 10;
+                endY += Math.cos(Date.now() * 0.015) * gameState.nibbleIntensity * 5;
+            }
+            
+            // Draw fishing line
+            ctx.beginPath();
+            
+            if (gameState.isPulling) {
+                // During pull, line goes straight from rod tip to hook
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(endX, endY);
+            } else if (gameState.fishBiting) {
+                // When fish is biting, line has tension with some movement
+                ctx.moveTo(startX, startY);
+                
+                // Add curve and movement to the line when fish is biting
+                const controlX = (startX + endX) / 2 + Math.sin(Date.now() * 0.01) * gameState.biteIntensity * 10;
+                const controlY = (startY + endY) / 2 + Math.cos(Date.now() * 0.015) * gameState.biteIntensity * 5;
+                
+                ctx.quadraticCurveTo(controlX, controlY, endX, endY);
+                
+                // Move hook position randomly when fish is biting
+                gameState.hookPosition.x += Math.sin(Date.now() * 0.01) * gameState.biteIntensity * 2;
+                gameState.hookPosition.y += Math.cos(Date.now() * 0.015) * gameState.biteIntensity;
+                
+                // Keep hook underwater
+                if (gameState.hookPosition.y < canvas.height * 0.6) {
+                    gameState.hookPosition.y = canvas.height * 0.6;
+                }
+            } else {
+                // Normal fishing line with gentle curve
+                ctx.moveTo(startX, startY);
+                
+                // Calculate control point for curve - ensure line doesn't go below water
+                const controlX = (startX + endX) / 2;
+                let controlY;
+                
+                if (startY < canvas.height * 0.6 && endY < canvas.height * 0.6) {
+                    // Both points above water, curve up
+                    controlY = Math.min(startY, endY) - 20;
+                } else if (startY < canvas.height * 0.6) {
+                    // Rod above water, hook in water
+                    controlY = startY;
+                } else {
+                    // Both points below water (shouldn't happen)
+                    controlY = Math.min(startY, endY);
+                }
+                
+                ctx.quadraticCurveTo(controlX, controlY, endX, endY);
+            }
+            
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Draw bobber with shadow and highlight (cải thiện hiển thị phao câu)
+            // Draw shadow
+            ctx.beginPath();
+            ctx.arc(endX + 2, endY + 2, gameState.bobberSize, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.fill();
+            
+            // Draw main bobber
+            ctx.beginPath();
+            ctx.arc(endX, endY, gameState.bobberSize, 0, Math.PI * 2);
+            ctx.fillStyle = '#FF0000'; // Đỏ tươi hơn
+            ctx.fill();
+            
+            // Add white outline to make phao nổi bật hơn
+            ctx.beginPath();
+            ctx.arc(endX, endY, gameState.bobberSize + 1, 0, Math.PI * 2);
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            
+            // Add highlight reflection
+            ctx.beginPath();
+            ctx.arc(endX - gameState.bobberSize * 0.3, endY - gameState.bobberSize * 0.3, gameState.bobberSize * 0.3, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.fill();
+            
+            // Draw hook
+            if (gameState.baitInWater && !gameState.isPulling) {
+                ctx.beginPath();
+                ctx.arc(endX, endY + 8, 3, 0, Math.PI * 2);
+                ctx.fillStyle = 'silver';
+                ctx.fill();
+            }
+        }
+
+        // Draw game background
+        function drawBackground() {
+            // Sky gradient - cập nhật màu cho hoàng hôn
+            const skyGradient = ctx.createLinearGradient(0, 0, 0, canvas.height * 0.6);
+            skyGradient.addColorStop(0, getComputedStyle(document.documentElement).getPropertyValue('--sky-color-top'));
+            skyGradient.addColorStop(1, getComputedStyle(document.documentElement).getPropertyValue('--sky-color-bottom'));
+            
+            ctx.fillStyle = skyGradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height * 0.6);
+            
+            // Sun/moon - điều chỉnh vị trí và màu sắc mặt trời thành hoàng hôn
+            const sunRadius = canvas.width * 0.06;
+            // Vị trí ngang (căn cứ vào timeOfDay)
+            const sunX = canvas.width * (0.15 + gameState.timeOfDay * 0.7);
+            // Vị trí chính giữa đường chân trời (nửa trên, nửa dưới)
+            const sunY = canvas.height * 0.6;
+            
+            // Gradient cho mặt trời màu hồng đậm (hoàng hôn)
+            const sunGradient = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunRadius);
+            sunGradient.addColorStop(0, '#FF6B5E'); // Hồng đậm ở giữa
+            sunGradient.addColorStop(0.7, '#FF4136'); // Đỏ cam ở viền
+            sunGradient.addColorStop(1, 'rgba(255, 65, 54, 0)'); // Trong suốt ở ngoài cùng
+            
+            // Vẽ hiệu ứng ánh sáng quanh mặt trời
+            ctx.beginPath();
+            ctx.arc(sunX, sunY, sunRadius * 1.5, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255, 107, 94, 0.2)';
+            ctx.fill();
+            
+            // Vẽ mặt trời
+            ctx.beginPath();
+            ctx.arc(sunX, sunY, sunRadius, 0, Math.PI * 2);
+            ctx.fillStyle = sunGradient;
+            ctx.fill();
+            
+            // Draw clouds
+            drawClouds();
+            
+            // Water gradient
+            const waterGradient = ctx.createLinearGradient(0, canvas.height * 0.6, 0, canvas.height);
+            waterGradient.addColorStop(0, getComputedStyle(document.documentElement).getPropertyValue('--water-color'));
+            waterGradient.addColorStop(1, getComputedStyle(document.documentElement).getPropertyValue('--water-deep-color'));
+            
+            ctx.fillStyle = waterGradient;
+            ctx.fillRect(0, canvas.height * 0.6, canvas.width, canvas.height * 0.4);
+            
+            // Draw water surface line with wave effect
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height * 0.6);
+            
+            for (let x = 0; x < canvas.width; x += 10) {
+                const waveHeight = Math.sin(x * 0.02 + Date.now() * 0.001) * 2;
+                ctx.lineTo(x, canvas.height * 0.6 + waveHeight);
+            }
+            
+            ctx.lineTo(canvas.width, canvas.height * 0.6);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Land on the left
+            ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--land-color');
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height * 0.6);
+            ctx.lineTo(canvas.width * 0.1, canvas.height * 0.6);
+            ctx.lineTo(canvas.width * 0.15, canvas.height * 0.65);
+            ctx.lineTo(0, canvas.height * 0.65);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Draw grass
+            drawGrass();
+        }
+
+        // Draw clouds
+        function drawClouds() {
+            // Cloud parameters
+            const cloudPositions = [
+                { x: canvas.width * 0.2, y: canvas.height * 0.2, size: 30 },
+                { x: canvas.width * 0.5, y: canvas.height * 0.15, size: 40 },
+                { x: canvas.width * 0.8, y: canvas.height * 0.25, size: 25 }
+            ];
+            
+            // Draw each cloud
+            for (const cloud of cloudPositions) {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                
+                // Cloud shape made of multiple circles
+                ctx.beginPath();
+                ctx.arc(cloud.x, cloud.y, cloud.size, 0, Math.PI * 2);
+                ctx.arc(cloud.x + cloud.size * 0.8, cloud.y - cloud.size * 0.2, cloud.size * 0.8, 0, Math.PI * 2);
+                ctx.arc(cloud.x + cloud.size * 1.5, cloud.y, cloud.size * 0.9, 0, Math.PI * 2);
+                ctx.arc(cloud.x + cloud.size * 0.5, cloud.y + cloud.size * 0.3, cloud.size * 0.7, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // Draw grass on the land
+        function drawGrass() {
+            ctx.fillStyle = '#567d46';
+            
+            for (let x = 0; x < canvas.width * 0.15; x += 4) {
+                const height = Math.random() * 10 + 5;
+                ctx.beginPath();
+                ctx.moveTo(x, canvas.height * 0.6);
+                ctx.lineTo(x + 2, canvas.height * 0.6 - height);
+                ctx.lineTo(x + 4, canvas.height * 0.6);
+                ctx.fill();
+            }
+        }
+
+        // Cast fishing rod
+        function castRod() {
+            if (gameState.rodCast) return;
+            
+            // Remove bite alert class
+            pullBtn.classList.remove('bite-alert');
+            
+            // Calculate cast strength
+            gameState.castStrength = Math.random() * 0.5 + 0.3; // 0.3 to 0.8
+            
+            // Set hook position
+            const distance = canvas.width * gameState.castStrength;
+            gameState.hookPosition = {
+                x: gameState.rodPosition.x + distance,
+                y: canvas.height * 0.4
+            };
+            
+            // Reset wait time and set a random time until fish might bite
+            gameState.currentWaitTime = 0;
+            gameState.biteCountdown = Math.random() * 
+                (gameState.maxWaitTimeForBite - gameState.minWaitTimeForBite) + 
+                gameState.minWaitTimeForBite;
+            
+            // Create animation for hook falling into water - NHANH HƠN
+            const hookFallInterval = setInterval(() => {
+                gameState.hookPosition.y += gameState.hookFallSpeed; // Tăng tốc độ rơi 
+                
+                // Create ripple when hook hits water
+                if (gameState.hookPosition.y >= canvas.height * 0.6 && !gameState.baitInWater) {
+                    gameState.baitInWater = true;
+                    
+                    // Create water ripple effect
+                    gameState.waterRipples.push({
+                        x: gameState.hookPosition.x,
+                        y: canvas.height * 0.6,
+                        size: 0,
+                        maxSize: 40,
+                        speed: 1.5
+                    });
+                }
+                
+                // Stop hook at a random depth (nhanh hơn)
+                if (gameState.hookPosition.y >= canvas.height * 0.6 + Math.random() * (canvas.height * 0.2)) {
+                    clearInterval(hookFallInterval);
+                }
+            }, 20); // Giảm thời gian interval từ 50ms xuống 20ms
+            
+            gameState.rodCast = true;
+            castBtn.disabled = true;
+            showMessage("Đã quăng cần! Chờ cá cắn câu...", 2000);
+        }
+
+        // Pull fishing rod (attempt to catch fish)
+        function pullRod() {
+            if (!gameState.rodCast || !gameState.fishBiting) return;
+            
+            // Remove bite alert class
+            pullBtn.classList.remove('bite-alert');
+            
+            // Clear bite timer
+            if (gameState.biteTimer) {
+                clearTimeout(gameState.biteTimer);
+                gameState.biteTimer = null;
+            }
+            
+            // Start pull animation
+            gameState.isPulling = true;
+            gameState.pullAnimationTime = 0;
+            
+            // Check if there's a biting fish
+            const bitingFish = gameState.fishes.find(fish => fish.biting);
+            
+            if (bitingFish) {
+                // Chance to catch fish based on fish size and bite power
+                const difficultyFactor = bitingFish.bitePower * gameState.catchDifficulty;
+                const catchChance = 0.7 - difficultyFactor * 0.3; // 40% to 70% chance
+                
+                if (Math.random() < catchChance) {
+                    // Fish caught!
+                    bitingFish.caught = true;
+                    gameState.fishCaught = bitingFish;
+                    
+                    // Create water splash effect
+                    gameState.waterRipples.push({
+                        x: bitingFish.x,
+                        y: canvas.height * 0.6,
+                        size: 0,
+                        maxSize: 60,
+                        speed: 2
+                    });
+                    
+                    // Animate hook and fish snapping to rod
+                    animatePullSuccess(bitingFish);
+                } else {
+                    // Fish escaped
+                    bitingFish.biting = false;
+                    bitingFish.interested = false;
+                    gameState.fishBiting = false;
+                    
+                    // Create water splash effect
+                    gameState.waterRipples.push({
+                        x: bitingFish.x,
+                        y: canvas.height * 0.6,
+                        size: 0,
+                        maxSize: 40,
+                        speed: 1.5
+                    });
+                    
+                    showMessage("Cá vuột mất rồi!", 2000);
+                    
+                    // Reset game state for next cast after pull animation
+                    setTimeout(() => {
+                        gameState.isPulling = false;
+                        resetRod();
+                    }, 300); // Giảm từ 500ms xuống 300ms
+                }
+            } else {
+                // No fish was biting - rare case
+                gameState.fishBiting = false;
+                
+                // Reset game state for next cast after pull animation
+                setTimeout(() => {
+                    gameState.isPulling = false;
+                    resetRod();
+                }, 300); // Giảm từ 500ms xuống 300ms
+            }
+            
+            pullBtn.disabled = true;
+        }
+        
+        // Animate successful pull with fish - Kéo cá chậm hơn và mượt hơn
+        function animatePullSuccess(bitingFish) {
+            // Create animation for hook and fish returning quickly to rod
+            const startX = gameState.hookPosition.x;
+            const startY = gameState.hookPosition.y;
+            const endX = gameState.rodPosition.x;
+            const endY = gameState.rodPosition.y - canvas.height * 0.2; // Position above rod
+            
+            const duration = gameState.pullAnimationDuration; // Thời gian kéo cá ngắn hơn (0.6s)
+            const pullCurve = gameState.pullAnimationCurve; // Đường cong Easing giảm (0.6)
+            let elapsed = 0;
+            
+            const pullInterval = setInterval(() => {
+                // Update elapsed time - tăng bước cập nhật
+                elapsed += 0.1; // Tăng từ 0.05 lên 0.1
+                const progress = Math.min(elapsed / duration, 1);
+                
+                // Apply easing function for more natural movement
+                const easedProgress = 1 - Math.pow(1 - progress, pullCurve * 3);
+                
+                // Move hook position with easing
+                gameState.hookPosition.x = startX + (endX - startX) * easedProgress;
+                gameState.hookPosition.y = startY + (endY - startY) * easedProgress;
+                
+                // When animation completes
+                if (progress >= 1) {
+                    clearInterval(pullInterval);
+                    
+                    // Start fish flopping animation
+                    gameState.fishFlopping = true;
+                    gameState.flopIntensity = 1;
+                    gameState.flopTimer = 2; // 2 seconds of flopping
+                    
+                    // Add score and update counters
+                    const points = bitingFish.pointValue;
+                    gameState.score += points;
+                    gameState.fishCount++;
+                    
+                    scoreDisplay.textContent = gameState.score;
+                    fishCountDisplay.textContent = gameState.fishCount;
+                    
+                    showMessage(`Bạn đã câu được cá! +${points} điểm`, 2000);
+                    
+                    // Reset game state for next cast after flopping animation
+                    setTimeout(() => {
+                        gameState.isPulling = false;
+                        gameState.fishFlopping = false;
+                        gameState.flopIntensity = 0;
+                        resetRod();
+                        
+                        // Make the caught fish invisible
+                        bitingFish.visible = false;
+                        
+                        // Add a new fish to replace the caught one
+                        const size = Math.random() * 20 + 15;
+                        const x = Math.random() * canvas.width;
+                        const y = canvas.height * 0.7 + Math.random() * (canvas.height * 0.2);
+                        const speed = Math.random() * 0.4 + 0.2; // Giảm tốc độ
+                        const direction = Math.random() > 0.5 ? 1 : -1;
+                        const isBlueFish = Math.random() < 0.3; // 30% chance for blue fish
+                        
+                        gameState.fishes.push(new Fish(x, y, size, speed, direction, isBlueFish));
+                    }, 1000); // Giảm từ 2000ms xuống 1000ms
+                }
+            }, 20); // Giảm từ 30ms xuống 20ms
+        }
+
+        // Reset fishing rod
+        function resetRod() {
+            gameState.rodCast = false;
+            gameState.baitInWater = false;
+            gameState.fishBiting = false;
+            gameState.fishCaught = null;
+            gameState.rodTiltAmount = 0;
+            gameState.rodTiltTarget = 0;
+            gameState.biteIntensity = 0;
+            gameState.rodShakeIntensity = 0;
+            gameState.nibbleIntensity = 0;
+            castBtn.disabled = false;
+            pullBtn.disabled = true;
+            pullBtn.classList.remove('bite-alert');
+        }
+
+        // Generate fish nibbles - hiệu ứng cá đớp mồi nhẹ
+        function generateFishNibbles() {
+            if (gameState.baitInWater && !gameState.fishBiting && Math.random() < 0.003) {
+                // Start a new nibble sequence
+                gameState.nibbleTimer = Math.random() * 1.5 + 0.5;
+                gameState.nibbleIntensity = Math.random() * 0.1 + 0.05;
+                
+                // Create small ripple at hook
+                gameState.waterRipples.push({
+                    x: gameState.hookPosition.x,
+                    y: canvas.height * 0.6,
+                    size: 0,
+                    maxSize: 15,
+                    speed: 0.8
+                });
+            }
+            
+            // Update nibble state
+            if (gameState.nibbleTimer > 0) {
+                gameState.nibbleTimer -= 0.02;
+                if (gameState.nibbleTimer <= 0) {
+                    gameState.nibbleIntensity = 0;
+                }
+            }
+        }
+
+        // Game loop
+        let lastTime = 0;
+        function gameLoop(timestamp) {
+            // Calculate delta time
+            const deltaTime = lastTime ? (timestamp - lastTime) / 1000 : 0;
+            lastTime = timestamp;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Update day/night cycle
+            gameState.timeOfDay += gameState.daySpeed;
+            if (gameState.timeOfDay > 1) {
+                gameState.timeOfDay = 0;
+            }
+            
+            // Update wait time for fish biting
+            if (gameState.rodCast && gameState.baitInWater && !gameState.fishBiting) {
+                gameState.currentWaitTime += deltaTime;
+            }
+            
+            // Update pull animation time
+            if (gameState.isPulling) {
+                gameState.pullAnimationTime += deltaTime;
+            }
+            
+            // Update fish flopping animation
+            if (gameState.fishFlopping) {
+                gameState.flopTimer -= deltaTime;
+                if (gameState.flopTimer <= 0) {
+                    gameState.flopIntensity *= 0.95; // Fade out flopping
+                    
+                    if (gameState.flopIntensity < 0.05) {
+                        gameState.fishFlopping = false;
+                        gameState.flopIntensity = 0;
+                    }
+                }
+            }
+            
+            // Generate fish nibbles
+            generateFishNibbles();
+            
+            // Create and update bait ripples
+            createBaitRipples();
+            updateBaitRipples();
+            
+            // Draw background
+            drawBackground();
+            
+            // Draw seaweed (behind algae)
+            drawSeaweed(timestamp);
+            
+            // Draw algae
+            drawAlgae(timestamp);
+            
+            // Update and draw underwater particles
+            updateUnderwaterParticles();
+            drawUnderwaterParticles();
+            
+            // Draw bait ripples
+            drawBaitRipples();
+            
+            // Update and draw water ripples
+            updateWaterRipples();
+            drawWaterRipples();
+            
+            // Generate random fish jumps
+            generateFishJump();
+            
+            // Update and draw fish jumps
+            for (let i = gameState.fishJumps.length - 1; i >= 0; i--) {
+                const jump = gameState.fishJumps[i];
+                const active = jump.update(deltaTime);
+                
+                if (active) {
+                    jump.draw();
+                } else {
+                    gameState.fishJumps.splice(i, 1);
+                }
+            }
+            
+            // Draw fishing rod (after water to appear above it)
+            drawFishingRod();
+            
+            // Update and draw fish
+            for (const fish of gameState.fishes) {
+                fish.update(deltaTime);
+                fish.draw();
+            }
+            
+            // Show tutorial message
+            if (gameState.tutorial) {
+                showMessage("Nhấn nút Quăng Cần để bắt đầu!", 3000);
+                gameState.tutorial = false;
+            }
+            
+            // Request next frame
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Initialize game
+        function initGame() {
+            // Set rod position
+            gameState.rodPosition = {
+                x: canvas.width * 0.05,
+                y: canvas.height * 0.6
+            };
+            
+            // Initialize fish
+            initFish();
+            
+            // Initialize underwater elements
+            initUnderwaterElements();
+            
+            // Set bobber size
+            gameState.bobberSize = Math.max(canvas.width * 0.01, 6); // Tỉ lệ theo kích thước màn hình
+            
+            // Start game loop
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Event listeners
+        castBtn.addEventListener('click', castRod);
+        pullBtn.addEventListener('click', pullRod);
+        
+        // Wait for both images to load
+        let imagesLoaded = 0;
+        
+        function checkAllImagesLoaded() {
+            imagesLoaded++;
+            if (imagesLoaded === 2) {
+                initGame();
+            }
+        }
+        
+        gameState.fishImage.onload = checkAllImagesLoaded;
+        gameState.blueFishImage.onload = checkAllImagesLoaded;
+    </script>
+</body>
+</html>
