@@ -273,14 +273,13 @@
             fishFlopping: false,
             flopIntensity: 0,
             flopTimer: 0,
-            pullAnimationDuration: 0.6, // Giảm thời gian kéo cá (từ 1.2 xuống 0.6 giây)
-            pullAnimationCurve: 0.6, // Giảm đường cong Easing để nhanh hơn (từ 0.8 xuống 0.6)
+            pullAnimationDuration: 1.2, // Kéo dài thời gian kéo cá (giây)
+            pullAnimationCurve: 0.8, // Đường cong Easing (0-1)
             nibbleTimer: 0, // Thời gian giữa các lần cá đớp mồi nhẹ
             nibbleIntensity: 0, // Cường độ cá đớp mồi nhẹ
             bobberSize: 8, // Tăng kích thước phao
             biteProbability: 0.3, // Tăng xác suất cá cắn câu (30% thay vì 10%)
-            showBiteMessage: true, // Hiển thị thông báo khi cá cắn câu
-            hookFallSpeed: 15 // Tăng tốc độ rơi của phao (từ 5 lên 15)
+            showBiteMessage: true // Hiển thị thông báo khi cá cắn câu
         };
 
         // Load fish images
@@ -628,7 +627,7 @@
         // Initialize fish
         function initFish() {
             gameState.fishes = [];
-            const fishCount = Math.floor(Math.random() * 2) + 3; // 3-4 cá
+            const fishCount = Math.floor(Math.random() * 2) + 3; // 3-4 cá (tăng lên để cá cắn câu nhiều hơn)
             
             for (let i = 0; i < fishCount; i++) {
                 const size = Math.random() * 20 + 15;
@@ -1258,9 +1257,9 @@
                 (gameState.maxWaitTimeForBite - gameState.minWaitTimeForBite) + 
                 gameState.minWaitTimeForBite;
             
-            // Create animation for hook falling into water - NHANH HƠN
+            // Create animation for hook falling into water
             const hookFallInterval = setInterval(() => {
-                gameState.hookPosition.y += gameState.hookFallSpeed; // Tăng tốc độ rơi 
+                gameState.hookPosition.y += 5;
                 
                 // Create ripple when hook hits water
                 if (gameState.hookPosition.y >= canvas.height * 0.6 && !gameState.baitInWater) {
@@ -1276,11 +1275,11 @@
                     });
                 }
                 
-                // Stop hook at a random depth (nhanh hơn)
+                // Stop hook at a random depth
                 if (gameState.hookPosition.y >= canvas.height * 0.6 + Math.random() * (canvas.height * 0.2)) {
                     clearInterval(hookFallInterval);
                 }
-            }, 20); // Giảm thời gian interval từ 50ms xuống 20ms
+            }, 50);
             
             gameState.rodCast = true;
             castBtn.disabled = true;
@@ -1349,7 +1348,7 @@
                     setTimeout(() => {
                         gameState.isPulling = false;
                         resetRod();
-                    }, 300); // Giảm từ 500ms xuống 300ms
+                    }, 500);
                 }
             } else {
                 // No fish was biting - rare case
@@ -1359,7 +1358,7 @@
                 setTimeout(() => {
                     gameState.isPulling = false;
                     resetRod();
-                }, 300); // Giảm từ 500ms xuống 300ms
+                }, 500);
             }
             
             pullBtn.disabled = true;
@@ -1373,13 +1372,13 @@
             const endX = gameState.rodPosition.x;
             const endY = gameState.rodPosition.y - canvas.height * 0.2; // Position above rod
             
-            const duration = gameState.pullAnimationDuration; // Thời gian kéo cá ngắn hơn (0.6s)
-            const pullCurve = gameState.pullAnimationCurve; // Đường cong Easing giảm (0.6)
+            const duration = gameState.pullAnimationDuration; // Kéo dài thời gian kéo cá
+            const pullCurve = gameState.pullAnimationCurve; // Đường cong Easing
             let elapsed = 0;
             
             const pullInterval = setInterval(() => {
-                // Update elapsed time - tăng bước cập nhật
-                elapsed += 0.1; // Tăng từ 0.05 lên 0.1
+                // Update elapsed time
+                elapsed += 0.05;
                 const progress = Math.min(elapsed / duration, 1);
                 
                 // Apply easing function for more natural movement
@@ -1427,9 +1426,9 @@
                         const isBlueFish = Math.random() < 0.3; // 30% chance for blue fish
                         
                         gameState.fishes.push(new Fish(x, y, size, speed, direction, isBlueFish));
-                    }, 1000); // Giảm từ 2000ms xuống 1000ms
+                    }, 2000);
                 }
-            }, 20); // Giảm từ 30ms xuống 20ms
+            }, 30);
         }
 
         // Reset fishing rod
