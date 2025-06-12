@@ -2016,7 +2016,7 @@ async function processSubmission(msg, targetMsg) {
     case -1002382659317: 
     case -1002208226506:
     case -1002446612440:
-    case -1002080535296:
+    case -1002523456421:
       pricePerKeo = 1000;
       pricePerQuay = 350;
       break;
@@ -2225,126 +2225,6 @@ async function sendAggregatedData2(chatId) {
 
 
 
-bot.onText(/\/nary/, async (msg) => {
-  const chatId = msg.chat.id;
-  await sendAggregatedData3(chatId);
-});
-
-async function sendAggregatedData3(chatId) {
-  try {
-    // Tính ngày hôm qua
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1); // Điều chỉnh ngày hiện tại
-    const startOfYesterday = new Date(yesterday.setHours(0, 0, 0, 0));
-    const endOfYesterday = new Date(yesterday.setHours(23, 59, 59, 999));
-
-    // Lấy bảng công của ngày hôm qua cho các nhóm trong allowedGroupIds
-    const bangCongs = await BangCong2.find({
-      date: { $gte: startOfYesterday, $lte: endOfYesterday },
-      groupId: { $in: -1002382659317 }, // Chỉ bao gồm các nhóm trong allowedGroupIds
-    });
-
-    if (bangCongs.length === 0) {
-      bot.sendMessage(chatId, `Không có bảng công nào cho ngày ${yesterday.toLocaleDateString()}.`);
-      return;
-    }
-
-    // Tạo bảng công phân loại theo ID nhóm và tính tổng tiền của mỗi thành viên
-    const groupedByGroupId = {};
-    const totalByMember = {}; // Tổng tiền của từng thành viên
-
-    bangCongs.forEach((bangCong) => {
-      const groupId = bangCong.groupId ? bangCong.groupId.toString() : '';
-      if (!groupedByGroupId[groupId]) {
-        groupedByGroupId[groupId] = [];
-      }
-      groupedByGroupId[groupId].push(bangCong);
-
-      // Cộng dồn tổng tiền cho mỗi thành viên từ các nhóm
-      if (bangCong.ten && bangCong.tinh_tien !== undefined) {
-        if (!totalByMember[bangCong.ten]) {
-          totalByMember[bangCong.ten] = 0;
-        }
-        totalByMember[bangCong.ten] += bangCong.tinh_tien;
-      }
-    });
-
-    let response = '';
-
-    // Tạo bảng công cho mỗi nhóm
-    for (const groupId in groupedByGroupId) {
-      if (!groupId) {
-        continue;
-      }
-
-      const groupData = groupedByGroupId[groupId];
-
-      // Lấy thông tin nhóm từ Telegram API
-      let groupName;
-      try {
-        const chatInfo = await bot.getChat(groupId);
-        groupName = chatInfo.title || `Nhóm ${groupId}`;
-      } catch (error) {
-        console.error(`Không thể lấy thông tin nhóm ${groupId}:`, error);
-        groupName = `Nhóm ${groupId}`;
-      }
-
-      response += `Bảng công nhóm ${groupName} (${yesterday.toLocaleDateString()}):\n\n`;
-
-      let totalGroupMoney = 0;
-      let totalBills = 0;
-      let totalImages = 0;
-
-      groupData.forEach((bangCong) => {
-        if (bangCong.tinh_tien !== undefined) {
-          const formattedTien = bangCong.tinh_tien.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-
-          // Hiển thị số bill và ảnh chỉ khi chúng có giá trị lớn hơn 0
-          let billInfo = '';
-          let imageInfo = '';
-
-          if (bangCong.bill > 0) {
-            billInfo = `${bangCong.bill} bill\t`;
-          }
-
-          if (bangCong.anh > 0) {
-            imageInfo = `${bangCong.anh} ảnh\t`;
-          }
-
-          response += `${bangCong.ten}\t\t${billInfo}${imageInfo}${bangCong.quay}q +\t${bangCong.keo}c\t${formattedTien}vnđ\n`;
-
-          totalGroupMoney += bangCong.tinh_tien;
-          totalBills += bangCong.bill;
-          totalImages += bangCong.anh;
-        }
-      });
-
-      const formattedTotal = totalGroupMoney.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-      response += `Tổng tiền: ${formattedTotal}vnđ\n`;
-      response += `Tổng bill: ${totalBills}\n`;
-      response += `Tổng ảnh: ${totalImages}\n\n`;
-    }   
-
-    // Kiểm tra độ dài response và gửi tin nhắn
-    if (response.length > 4000) {
-      const middle = Math.floor(response.length / 2);
-      const splitIndex = response.lastIndexOf('\n', middle);
-
-      const firstPart = response.substring(0, splitIndex).trim();
-      const secondPart = response.substring(splitIndex).trim();
-
-      bot.sendMessage(chatId, firstPart);
-      bot.sendMessage(chatId, secondPart);
-    } else {
-      bot.sendMessage(chatId, response.trim());
-    }
-  } catch (error) {
-    console.error('Lỗi khi truy vấn dữ liệu từ MongoDB:', error);
-    bot.sendMessage(chatId, 'Đã xảy ra lỗi khi truy vấn dữ liệu từ cơ sở dữ liệu.');
-  }
-}
-
-
     
 
 // Chức năng tự động gửi hình ảnh vào 9h sáng mỗi ngày (theo giờ Việt Nam)
@@ -2374,7 +2254,7 @@ const managementFees = {
   '-1002186698265': 75000,
   '-1002439441449': 80000, 
   '-1002278963130': 100000,
-  '-1002317530934': 50000,
+  '-1002523456421': 50000,
   '-1002360155473': 80000,
   '-1002246062598': 50000,
   '-1002350493572': 75000,
@@ -2591,13 +2471,13 @@ const otherGroupIds = allGroupIds.filter(id => !excludedGroupIds.includes(id));
 
 
 const managementFees2 = {
-  '-1002446612440': 50000 
+  '-1002523456421': 50000 
 };
 
 const allowedGroupIdsnary = [
   -1002382659317 ];
 const allowedGroupIds2 = [
-  -1002446612440
+  -1002523456421
 ];
 
 async function processAndDistributeTimesheets2(chatId, isToday) {
